@@ -63,11 +63,33 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 	c.JSON(http.StatusOK, order)
 }
 
+func (s *Server) PostMgrOrderState(c *gin.Context) {
+	if !lok.OrderLok.Lock(payload.OrderID) {
+		return nil, cerr.OrderTmpLocked
+	}
+	defer lok.OrderLok.Unlock(payload.OrderID)
+
+	var order front.Order
+	err := s.DB.InTx(func(tx *dbsrv.DbService) error {
+		return s.DB.MgrOrderState(&order, s.AdminClaims(c), s.WxClient)
+	})
+	if Abort(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, &order)
+}
+
 func (s *Server) PostOrderState(c *gin.Context) {
 	var payload front.OrderChangeStatePayload
 	if err := c.BindJSON(&payload); Abort(c, err) {
 		return
 	}
+
+	if !lok.OrderLok.Lock(payload.OrderID) {
+		return nil, cerr.OrderTmpLocked
+	}
+	defer lok.OrderLok.Unlock(payload.OrderID)
 
 	var order front.Order
 	err := s.DB.InTx(func(tx *dbsrv.DbService) error {

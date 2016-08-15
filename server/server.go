@@ -55,6 +55,10 @@ func (s *Server) BuildEngine() error {
 	}))
 	router.Use(corsMiddleWare)
 
+	// for admin
+	a := router.Group("/admin", s.MustAdmin)
+	a.POST("/order_state", s.PostMgrOrderState)
+
 	router.POST(s.Config.Security.WxOauthPath, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
 

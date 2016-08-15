@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
@@ -83,4 +84,8 @@ func (s *Server) MustAdmin(c *gin.Context) {
 		return
 	}
 	c.Set(s.Admin.GinAdminKey, tok.Claims)
+}
+
+func (s *Server) AdminClaims(c *gin.Context) *admin.Claims {
+	return c.Keys[s.Admin.GinAdminKey].Claims.(*admin.Claims)
 }
