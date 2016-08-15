@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/contrib/secure"
 	"github.com/gin-gonic/gin"
 
+	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/captchar"
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/db-service"
@@ -22,6 +23,7 @@ type Server struct {
 	Config     *config.Config
 	Auther     *wo2.Auther
 	SecHandler *security.Handler
+	Admin      *admin.Admin
 	WxClient   *wx.WxClient
 	SmsSender  *sms.Sender
 	DB         *dbsrv.DbService

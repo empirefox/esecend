@@ -78,9 +78,9 @@ func (s *Server) HasToken(c *gin.Context) {
 }
 
 func (s *Server) MustAdmin(c *gin.Context) {
-	toki, ok := c.Keys[s.Auther.GinJwtKey]
-	tok := toki.(*jwt.Token)
-	if !ok || !tok.Valid || tok.Claims.(*front.TokenClaims).Subject != "Admin" {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	tok, err := s.Admin.ParseToken(c.Request)
+	if Abort(c, err) {
+		return
 	}
+	c.Set(s.Admin.GinAdminKey, tok.Claims)
 }

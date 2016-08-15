@@ -25,6 +25,7 @@ const (
 	NoRefreshToken
 	NoNeedRefreshToken
 	NoAccessToken
+	InvalidAccessToken
 	GenCaptchaFailed
 	RemoteHTTPFailed
 	InvalidTokenSubject

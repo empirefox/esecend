@@ -178,30 +178,17 @@ func (h *Handler) RevokeToken(tok *jwt.Token) error {
 }
 
 func (h *Handler) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
-	claims := tok.Claims.(*front.TokenClaims)
-
-	switch claims.Subject {
-	case "Weixin":
-		if tok.Method.Alg() != h.conf.SignAlg {
-			return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
-		}
-		key, ok := h.cache.Get(claims.Id)
-		if !ok {
-			return nil, fmt.Errorf("Unexpected claims id")
-		}
-		return key, nil
-
-	case "Admin":
-		if tok.Method.Alg() != h.conf.AdminSignType {
-			return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
-		}
-		if claims.ExpiresAt == 0 || claims.ExpiresAt-claims.IssuedAt > 600 {
-			return nil, cerr.InvalidTokenExpires
-		}
-		return []byte(h.conf.AdminKey), nil
+	if tok.Method.Alg() != h.conf.SignAlg {
+		return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
 	}
 
-	return nil, cerr.InvalidTokenSubject
+	claims := tok.Claims.(*front.TokenClaims)
+	key, ok := h.cache.Get(claims.Id)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected claims id")
+	}
+	return key, nil
+
 }
 
 func (h *Handler) ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interface{}, err error) {
