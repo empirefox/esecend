@@ -1,0 +1,227 @@
+package security
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/empirefox/reform"
+
+	"github.com/Sirupsen/logrus"
+	mpoauth2 "github.com/chanxuehong/wechat.v2/mp/oauth2"
+	"github.com/dchest/uniuri"
+	"github.com/delaemon/sonyflake"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
+	"github.com/empirefox/esecend/cerr"
+	"github.com/empirefox/esecend/config"
+	"github.com/empirefox/esecend/db-service"
+	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/esecend/models"
+	"github.com/patrickmn/go-cache"
+)
+
+var (
+	log = logrus.New()
+)
+
+type Handler struct {
+	conf  *config.Security
+	sf    *sonyflake.Sonyflake
+	cache *cache.Cache
+	db    *dbsrv.DbService
+}
+
+func NewHandler(config *config.Config, db *dbsrv.DbService) *Handler {
+	return &Handler{
+		conf:  &config.Security,
+		sf:    sonyflake.New(sonyflake.Settings{}),
+		cache: cache.New(config.Security.ExpiresMinute*time.Minute, config.Security.ClearsMinute*time.Minute),
+		db:    db,
+	}
+}
+
+func (h *Handler) Login(userinfo *mpoauth2.UserInfo) (interface{}, error) {
+	var usr models.User
+	var err error
+	var refreshToken = uniuri.NewLen(32)
+	var encRefreshToken []byte
+
+	if encRefreshToken, err = bcrypt.GenerateFromPassword([]byte(refreshToken), 4); err != nil {
+		return nil, err
+	}
+
+	tx, err := h.db.Tx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.RollbackIfNeeded()
+
+	db := tx.GetDB()
+	if err = db.FindOneTo(&usr, "$UnionId", userinfo.UnionId); err == reform.ErrNoRows {
+		usr = models.User{
+			OpenId:       userinfo.OpenId,
+			UnionId:      userinfo.UnionId,
+			RefreshToken: sql.RawBytes(encRefreshToken),
+			Privilege:    strings.Join(userinfo.Privilege, "|"),
+			CreatedAt:    time.Now().Unix(),
+
+			Nickname:     userinfo.Nickname,
+			Sex:          userinfo.Sex,
+			City:         userinfo.City,
+			Province:     userinfo.Province,
+			HeadImageURL: userinfo.HeadImageURL, // TODO Save to our cdn
+		}
+		err = db.Insert(&usr)
+	} else if err == nil {
+		usr.RefreshToken = sql.RawBytes(encRefreshToken)
+		usr.SigninAt = time.Now().Unix()
+		err = db.UpdateColumns(&usr, "RefreshToken", "SigninAt")
+	}
+	if err == nil {
+		err = tx.Commit()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	tok, err := h.NewToken(&usr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &front.UserTokenResponse{
+		AccessToken:  tok,
+		RefreshToken: &refreshToken,
+		User:         usr.Info(),
+	}, nil
+}
+
+// NewToken generate token string json
+func (h *Handler) NewToken(usr *models.User) (*string, error) {
+	return h.NewTokenWithIat(usr, time.Now().Unix())
+}
+
+func (h *Handler) NewTokenWithIat(usr *models.User, now int64) (*string, error) {
+	sonyid, err := h.sf.NextID()
+	if err != nil {
+		log.Debugln("sonyflake timeout")
+		return nil, err
+	}
+
+	claims := &front.TokenClaims{
+		StandardClaims: jwt.StandardClaims{
+			Id:        strconv.FormatUint(sonyid, 36),
+			ExpiresAt: now + h.conf.TokenLife*60,
+			IssuedAt:  now,
+			Subject:   "Weixin",
+		},
+		OpenId:    usr.OpenId,
+		UserId:    usr.ID,
+		LevelID:   usr.LevelID,
+		Privilege: usr.Privilege,
+		Phone:     usr.Phone,
+		Nonce:     uniuri.NewLen(32),
+	}
+
+	key := []byte(uniuri.NewLen(128))
+	h.cache.Set(claims.Id, key, cache.DefaultExpiration)
+
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(h.conf.SignAlg), claims)
+	tok, err := token.SignedString(key)
+	if err != nil {
+		return nil, err
+	}
+	return &tok, nil
+}
+
+func (h *Handler) RefreshToken(tok *jwt.Token, refreshToken []byte) (token *string, err error) {
+	claims := tok.Claims.(*front.TokenClaims)
+	if claims.ExpiresAt-time.Now().Unix() > h.conf.RefreshIn*60 {
+		return nil, cerr.NoNeedRefreshToken
+	}
+	if len(refreshToken) == 0 {
+		return nil, cerr.NoRefreshToken
+	}
+
+	var usr models.User
+	if err = h.db.GetDB().FindByPrimaryKeyTo(&usr, claims.UserId); err != nil {
+		return nil, err
+	}
+	if len(usr.RefreshToken) == 0 {
+		return nil, cerr.NoRefreshToken
+	}
+	if err = h.CompareRefreshToken([]byte(usr.RefreshToken), refreshToken); err != nil {
+		return nil, cerr.InvalidRefreshToken
+	}
+
+	token, err = h.NewToken(&usr)
+	if err != nil {
+		return nil, err
+	}
+	h.cache.Delete(claims.Id)
+	return token, nil
+}
+
+func (h *Handler) RevokeToken(tok *jwt.Token) error {
+	claims := tok.Claims.(*front.TokenClaims)
+	h.cache.Delete(claims.Id)
+	if claims.UserId == 0 {
+		return nil
+	}
+	return h.db.GetDB().UpdateColumns(&models.User{ID: claims.UserId}, "RefreshToken")
+}
+
+func (h *Handler) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
+	claims := tok.Claims.(*front.TokenClaims)
+
+	switch claims.Subject {
+	case "Weixin":
+		if tok.Method.Alg() != h.conf.SignAlg {
+			return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
+		}
+		key, ok := h.cache.Get(claims.Id)
+		if !ok {
+			return nil, fmt.Errorf("Unexpected claims id")
+		}
+		return key, nil
+
+	case "Admin":
+		if tok.Method.Alg() != h.conf.AdminSignType {
+			return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
+		}
+		if claims.ExpiresAt == 0 || claims.ExpiresAt-claims.IssuedAt > 600 {
+			return nil, cerr.InvalidTokenExpires
+		}
+		return []byte(h.conf.AdminKey), nil
+	}
+
+	return nil, cerr.InvalidTokenSubject
+}
+
+func (h *Handler) ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interface{}, err error) {
+	tok, err = request.ParseFromRequestWithClaims(req, request.OAuth2Extractor, &front.TokenClaims{}, h.FindKeyfunc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	claims := tok.Claims.(*front.TokenClaims)
+	usr := &models.User{
+		OpenId:    claims.OpenId,
+		ID:        claims.UserId,
+		LevelID:   claims.LevelID,
+		Privilege: claims.Privilege,
+		Phone:     claims.Phone,
+	}
+
+	return tok, usr, err
+}
+
+func (h *Handler) CompareRefreshToken(hashed, input []byte) error {
+	return bcrypt.CompareHashAndPassword(hashed, input)
+}
