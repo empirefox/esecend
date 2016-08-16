@@ -2,7 +2,6 @@ package security
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,10 +9,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/empirefox/reform"
-
-	"github.com/Sirupsen/logrus"
 	mpoauth2 "github.com/chanxuehong/wechat.v2/mp/oauth2"
+
 	"github.com/dchest/uniuri"
 	"github.com/delaemon/sonyflake"
 	"github.com/dgrijalva/jwt-go"
@@ -23,11 +20,8 @@ import (
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
+	"github.com/empirefox/reform"
 	"github.com/patrickmn/go-cache"
-)
-
-var (
-	log = logrus.New()
 )
 
 type Handler struct {
@@ -110,8 +104,7 @@ func (h *Handler) NewToken(usr *models.User) (*string, error) {
 func (h *Handler) NewTokenWithIat(usr *models.User, now int64) (*string, error) {
 	sonyid, err := h.sf.NextID()
 	if err != nil {
-		log.Debugln("sonyflake timeout")
-		return nil, err
+		return nil, cerr.SonyFlakeTimeout
 	}
 
 	claims := &front.TokenClaims{
@@ -179,13 +172,13 @@ func (h *Handler) RevokeToken(tok *jwt.Token) error {
 
 func (h *Handler) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
 	if tok.Method.Alg() != h.conf.SignAlg {
-		return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
+		return nil, cerr.InvalidSignAlg
 	}
 
 	claims := tok.Claims.(*front.TokenClaims)
 	key, ok := h.cache.Get(claims.Id)
 	if !ok {
-		return nil, fmt.Errorf("Unexpected claims id")
+		return nil, cerr.InvalidClaimId
 	}
 	return key, nil
 

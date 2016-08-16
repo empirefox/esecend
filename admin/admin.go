@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/dgrijalva/jwt-go"
@@ -9,6 +8,7 @@ import (
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/front"
+	"github.com/mcuadros/go-defaults"
 )
 
 type Claims struct {
@@ -31,9 +31,15 @@ type Admin struct {
 	GinAdminKey string `default:"ADMIN"`
 }
 
-func (a *Admin) FindAdminKeyfunc(tok *jwt.Token) (interface{}, error) {
+func NewAdmin(conf *config.Config) *Admin {
+	a := &Admin{conf: conf.Security}
+	defaults.SetDefaults(a)
+	return a
+}
+
+func (a *Admin) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
 	if tok.Method.Alg() != a.conf.AdminSignType {
-		return nil, fmt.Errorf("Unexpected signing method: %v", tok.Header["alg"])
+		return nil, cerr.InvalidSignAlg
 	}
 
 	claims := tok.Claims.(*Claims)
@@ -44,7 +50,7 @@ func (a *Admin) FindAdminKeyfunc(tok *jwt.Token) (interface{}, error) {
 }
 
 func (a *Admin) ParseToken(req *http.Request) (*jwt.Token, error) {
-	tok, err := request.ParseFromRequestWithClaims(req, request.OAuth2Extractor, &Claims{}, a.FindAdminKeyfunc)
+	tok, err := request.ParseFromRequestWithClaims(req, request.OAuth2Extractor, &Claims{}, a.FindKeyfunc)
 	if err != nil {
 		return nil, cerr.NoAccessToken
 	}

@@ -11,6 +11,7 @@ func (ce CodedError) Error() string {
 // all are non-StatusForbidden
 const (
 	Error CodedError = iota
+	SonyFlakeTimeout
 	InvalidUrlParam
 	InvalidPostBody
 	InvalidPhoneFormat
@@ -30,6 +31,8 @@ const (
 	RemoteHTTPFailed
 	InvalidTokenSubject
 	InvalidTokenExpires
+	InvalidSignAlg
+	InvalidClaimId
 	Forbidden
 
 	InvalidProductId

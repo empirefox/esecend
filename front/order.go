@@ -151,19 +151,19 @@ type CheckoutPayload struct {
 }
 
 type OrderChangeStatePayload struct {
-	ID        uint
-	CreatedAt int64
-	State     OrderState
+	ID    uint
+	State OrderState
 }
 
 type OrderPrepayPayload struct {
-	OrderID   uint
-	CreatedAt int64
-	Amount    uint
+	OrderID uint
+	Amount  uint
 
 	Cash   uint
 	Wx     uint
 	Points uint // just points not cents
+
+	Ip string
 }
 
 type OrderPrepayResponse struct {
@@ -172,10 +172,9 @@ type OrderPrepayResponse struct {
 }
 
 type OrderPayPayload struct {
-	Key       string
-	Amount    uint
-	OrderID   uint
-	CreatedAt int64
+	Key     string
+	Amount  uint
+	OrderID uint
 
 	Cash   uint
 	Points uint // just points not cents

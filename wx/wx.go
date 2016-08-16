@@ -114,7 +114,7 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 	defer lok.OrderLok.Unlock(payload.OrderID)
 
 	err = wc.dbs.InTx(func(dbs *dbsrv.DbService) error {
-		order, err := dbs.GetBareOrder(id, at)
+		order, err := dbs.GetBareOrder(id)
 		if err != nil {
 			return err
 		}

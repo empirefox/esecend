@@ -16,6 +16,8 @@ import (
 
 var log = logrus.New()
 
+type CommitTxFn func(t *DbService, commit func() error) error
+
 type DbService struct {
 	config   *config.Config
 	DS       *goqu.Dataset
@@ -68,6 +70,26 @@ func (dbs *DbService) InTx(f func(t *DbService) error) error {
 	if err == nil {
 		err = tx.tx.Commit()
 	}
+	if err == nil {
+		tx.Commited = true
+	}
+	return err
+}
+
+func (dbs *DbService) InCommitTx(f CommitTxFn) error {
+	tx, err := dbs.Tx()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if !tx.Commited {
+			// always return f() or Commit() error, not possible Rollback() error
+			_ = tx.tx.Rollback()
+		}
+	}()
+
+	err = f(tx, tx.tx.Commit)
 	if err == nil {
 		tx.Commited = true
 	}

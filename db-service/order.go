@@ -19,6 +19,7 @@ import (
 )
 
 type WxPaier interface {
+	UnifiedOrder(tokUsr *models.User, order *front.Order, ip string, attach *models.UnifiedOrderAttach) (*front.WxPayArgs, error)
 	OrderClose(order *front.Order) (map[string]string, error)
 	OrderRefund(order *front.Order, opUserId string) (map[string]string, error)
 }
@@ -238,9 +239,9 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	}
 
 	// complete order items after order saved
-	// TODO save user_id?
 	for _, item := range items {
 		product := productMap[item.ProductID]
+		item.UserID = tokUsr.ID
 		item.OrderID = order.ID
 		item.Name = product.Name
 		if item.Img == "" {
@@ -269,43 +270,41 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 
 // only used by PrepayOrder
 func (tx *DbService) prepayOrderAfterClosedWxOrder(
-	tokUsr *models.User,
-	order *front.Order,
-	unifiedOrder func(order *front.Order, attach *models.UnifiedOrderAttach) (*front.WxPayArgs, error),
-) (*front.WxPayArgs, error) {
+	tokUsr *models.User, order *front.Order, paier WxPaier, ip string,
+) (args *front.WxPayArgs, cashLocked, pointsLocked bool, err error) {
 
 	db := tx.GetDB()
 
-	if !lok.CashLok.Lock(tokUsr.ID) {
-		return nil, cerr.CashTmpLocked
+	if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+		err = cerr.CashTmpLocked
+		return
 	}
-	defer lok.CashLok.Unlock(tokUsr.ID)
 
 	var flow front.CapitalFlow
 	ds := tx.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
-	if err := db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-		return nil, err
+	if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
+		return
 	}
 
-	if !lok.PointsLok.Lock(tokUsr.ID) {
-		return nil, cerr.CashTmpLocked
+	if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+		err = cerr.PointsTmpLocked
+		return
 	}
-	defer lok.PointsLok.Unlock(tokUsr.ID)
 
 	var points front.PointsItem
 	ds = tx.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
-	if err := db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
-		return nil, err
+	if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
+		return
 	}
 
 	if uint(-flow.Amount) == order.CashPaid && uint(-points.Amount)*dbs.config.Order.Point2Cent == order.PointsPaid {
 		// no need prepay again
 
 		if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
-			return nil, err
+			return
 		}
 
-		attach := models.UnifiedOrderAttach{
+		attach := &models.UnifiedOrderAttach{
 			PreCashID:   flow.ID,
 			CashPaid:    order.CashPaid,
 			PrePointsID: points.ID,
@@ -313,65 +312,41 @@ func (tx *DbService) prepayOrderAfterClosedWxOrder(
 			UserID:      tokUsr.ID,
 		}
 
-		args, err := unifiedOrder(&order, &attach)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-
-		order.TransactionId = ""
-		order.TradeState = front.UNKNOWN
-		return args, nil
+		args, err = paier.UnifiedOrder(tokUsr, order, ip, attach)
+		return
 	}
 
 	// refund is allowed only when close order
 	if flow.ID != 0 || points.ID != 0 {
-		return nil, cerr.OrderCloseNeeded
+		err = cerr.OrderCloseNeeded
 	}
 
-	// means go on
-	return nil, nil
+	// args==nil err==nil means go on
+	return
 }
 
 // prepay with cash and points, then get wx prepay_id
 // cannot change prepaid when do the 2nd time
 func (dbs *DbService) PrepayOrder(
-	tokUsr *models.User,
-	payload *front.OrderPrepayPayload,
-	unifiedOrder func(order *front.Order, attach *models.UnifiedOrderAttach) (*front.WxPayArgs, error),
-	closeWxOrder func(order *front.Order) (map[string]string, error),
-) (*front.WxPayArgs, error) {
+	tokUsr *models.User, payload *front.OrderPrepayPayload, paier WxPaier,
+) (args *front.WxPayArgs, cashLocked, pointsLocked bool, err error) {
 
 	if payload.Wx == 0 {
-		return nil, cerr.NotPrepayOrder
+		err = cerr.NotPrepayOrder
+		return
 	}
 	pointsPaid := payload.Points * dbs.config.Order.Point2Cent
 	if payload.Amount != payload.Cash+payload.Wx+pointsPaid || payload.Amount == 0 {
-		return nil, cerr.InvalidPayAmount
+		err = cerr.InvalidPayAmount
+		return
 	}
 
-	if !lok.OrderLok.Lock(payload.OrderID) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
-
-	tx, err := dbs.Tx()
-	if err != nil {
-		return nil, err
-	}
-	var wxOrderClose bool
-	defer tx.RollbackIfNeeded()
-	db := tx.GetDB()
+	db := dbs.GetDB()
 
 	var order front.Order
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).
-		Where(goqu.I("$CreatedAt").Eq(payload.CreatedAt)).
-		Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
 	if err = db.DsSelectOneTo(&order, ds); err != nil {
-		return nil, err
+		return
 	}
 
 	// prepay after prepaid
@@ -380,45 +355,48 @@ func (dbs *DbService) PrepayOrder(
 			return nil, InvalidPrepayPayload
 		}
 		// close transaction_id firstly
-		res, err := closeWxOrder(order)
+		var res map[string]string
+		res, err = paier.OrderClose(order)
 		if err != nil {
-			return nil, err
+			return
 		}
 
 		if res["result_code"] == "SUCCESS" {
-			if !lok.CashLok.Lock(tokUsr.ID) {
-				return nil, cerr.CashTmpLocked
+			if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+				err = cerr.CashTmpLocked
+				return
 			}
-			defer lok.CashLok.Unlock(tokUsr.ID)
 
 			var flow front.CapitalFlow
 			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
 			if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-				return nil, err
+				return
 			}
 			if uint(-flow.Amount) != order.CashPaid {
-				return nil, cerr.InvalidCashPrepaid
+				err = cerr.InvalidCashPrepaid
+				return
 			}
 
-			if !lok.PointsLok.Lock(tokUsr.ID) {
-				return nil, cerr.CashTmpLocked
+			if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+				err = cerr.PointsTmpLocked
+				return
 			}
-			defer lok.PointsLok.Unlock(tokUsr.ID)
 
 			var points front.PointsItem
 			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
 			if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
-				return nil, err
+				return
 			}
 			if uint(-points.Amount)*dbs.config.Order.Point2Cent != order.PointsPaid {
-				return nil, cerr.InvalidPointsPrepaid
+				err = cerr.InvalidPointsPrepaid
+				return
 			}
 
 			if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
-				return nil, err
+				return
 			}
 
-			attach := models.UnifiedOrderAttach{
+			attach := &models.UnifiedOrderAttach{
 				PreCashID:   flow.ID,
 				CashPaid:    order.CashPaid,
 				PrePointsID: points.ID,
@@ -426,18 +404,8 @@ func (dbs *DbService) PrepayOrder(
 				UserID:      tokUsr.ID,
 			}
 
-			args, err := unifiedOrder(&order, &attach)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := tx.Commit(); err != nil {
-				return nil, err
-			}
-
-			order.TransactionId = ""
-			order.TradeState = front.UNKNOWN
-			return args, nil
+			args, err = paier.UnifiedOrder(tokUsr, &order, payload.Ip, attach)
+			return
 		} else {
 			// colse FAIL
 			log.WithFields(l.Locate(logrus.Fields{
@@ -447,30 +415,34 @@ func (dbs *DbService) PrepayOrder(
 
 			switch res["err_code"] {
 			case "ORDERPAID":
-				return nil, cerr.WxOrderAlreadyPaid
+				err = cerr.WxOrderAlreadyPaid
 			case "SYSTEMERROR":
-				return nil, cerr.WxSystemFailed
+				err = cerr.WxSystemFailed
 			case "ORDERNOTEXIST", "ORDERCLOSED":
 				// TODO remove this?
 				// check prepaid
-				args, err := tx.prepayOrderAfterClosedWxOrder(tokUsr, order, unifiedOrder)
-				if err != nil {
-					return nil, err
-				}
+				args, cashLocked, pointsLocked, err = dbs.prepayOrderAfterClosedWxOrder(tokUsr, &order, paier, payload.Ip)
 				if args != nil {
-					return args, nil
+					// return OK!
+					return
 				}
+				// to be continued, do DO NOT return!
 
 			default:
-				return nil, cerr.ApiImplementFailed
+				err = cerr.ApiImplementFailed
+			}
+			if err != nil {
+				return
 			}
 		}
 	} else if err = PermitOrderState(&order, front.TOrderStatePrepaid); err != nil {
-		return nil, cerr.NotNopayState
+		err = cerr.NotNopayState
+		return
 	}
 
 	if order.PayAmount != payload.Amount {
-		return nil, cerr.InvalidPayAmount
+		err = cerr.InvalidPayAmount
+		return
 	}
 
 	now := time.Now().Unix()
@@ -479,19 +451,23 @@ func (dbs *DbService) PrepayOrder(
 	}
 
 	if payload.Cash != 0 {
-		if !lok.CashLok.Lock(tokUsr.ID) {
-			return nil, cerr.CashTmpLocked
+		if !cashLocked {
+			cashLocked = lok.CashLok.Lock(tokUsr.ID)
 		}
-		defer lok.CashLok.Unlock(tokUsr.ID)
+		if !cashLocked {
+			err = cerr.CashTmpLocked
+			return
+		}
 
 		var flow front.CapitalFlow
 		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 		if err = db.DsSelectOneTo(&flow, ds); err != nil {
-			return nil, err
+			return
 		}
 
 		if flow.Balance < int(payload.Cash) {
-			return nil, cerr.NotEnoughMoney
+			err = cerr.NotEnoughMoney
+			return
 		}
 
 		err = db.Save(&front.CapitalFlow{
@@ -503,26 +479,30 @@ func (dbs *DbService) PrepayOrder(
 			OrderID:   order.ID,
 		})
 		if err != nil {
-			return nil, err
+			return
 		}
 		attach.CashPaid = payload.Cash
 		attach.PreCashID = flow.ID
 	}
 
 	if payload.Points != 0 {
-		if !lok.PointsLok.Lock(tokUsr.ID) {
-			return nil, cerr.CashTmpLocked
+		if !pointsLocked {
+			pointsLocked = lok.PointsLok.Lock(tokUsr.ID)
 		}
-		defer lok.PointsLok.Unlock(tokUsr.ID)
+		if !pointsLocked {
+			err = cerr.PointsTmpLocked
+			return
+		}
 
 		var points front.PointsItem
 		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 		if err = db.DsSelectOneTo(&points, ds); err != nil {
-			return nil, err
+			return
 		}
 
 		if points.Balance < int(payload.Points) {
-			return nil, cerr.NotEnoughPoints
+			err = cerr.NotEnoughPoints
+			return
 		}
 
 		err = db.Save(&front.PointsItem{
@@ -534,30 +514,10 @@ func (dbs *DbService) PrepayOrder(
 			OrderID:   order.ID,
 		})
 		if err != nil {
-			return nil, err
+			return
 		}
 		attach.PointsPaid = pointsPaid
 		attach.PrePointsID = points.ID
-	}
-
-	err = db.UpdateColumns(&front.Order{
-		ID:         order.ID,
-		CashPaid:   attach.CashPaid,
-		PointsPaid: attach.PointsPaid,
-		State:      front.TOrderStatePrepaid,
-		PrepaidAt:  now,
-	}, "CashPaid", "PointsPaid", "State", "PrepaidAt", "TransactionId", "TradeState")
-	if err != nil {
-		return nil, err
-	}
-
-	args, err := unifiedOrder(&order, &attach)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
 	}
 
 	order.CashPaid = attach.CashPaid
@@ -567,66 +527,61 @@ func (dbs *DbService) PrepayOrder(
 	order.TransactionId = ""
 	order.TradeState = front.UNKNOWN
 
-	return args, nil
+	err = db.UpdateColumns(&order, "CashPaid", "PointsPaid", "State", "PrepaidAt", "TransactionId", "TradeState")
+
+	if err == nil {
+		args, err = paier.UnifiedOrder(tokUsr, &order, payload.Ip, &attach)
+	}
+
+	return
 }
 
 // no wx pay, need paykey
-func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPayload) (*front.Order, error) {
+func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload *front.OrderPayPayload) (cashLocked, pointsLocked bool, err error) {
 	pointsPaid := payload.Points * dbs.config.Order.Point2Cent
 	if payload.Amount != payload.Cash+pointsPaid || payload.Amount == 0 {
-		return nil, cerr.InvalidPayAmount
+		err = cerr.InvalidPayAmount
+		return
 	}
-
-	if !lok.OrderLok.Lock(payload.OrderID) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
-
-	tx, err := dbs.Tx()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.RollbackIfNeeded()
-	db := tx.GetDB()
 
 	if err = db.Reload(tokUsr); err != nil {
-		return nil, err
+		return
 	}
 
 	if err = models.ComparePaykey([]byte(tokUsr.Paykey), []byte(payload.Key)); err != nil {
-		return nil, err
+		err = cerr.InvalidPaykey
+		return
 	}
 
-	var order front.Order
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).
-		Where(goqu.I("$CreatedAt").Eq(payload.CreatedAt)).
-		Where(goqu.I("$UserID").Eq(tokUsr.ID))
-	if err = db.DsSelectOneTo(&order, ds); err != nil {
-		return nil, err
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	if err = db.DsSelectOneTo(order, ds); err != nil {
+		return
 	}
-	if err = PermitOrderState(&order, front.TOrderStatePaid); err != nil {
-		return nil, cerr.NoWayToPaidState
+	if err = PermitOrderState(order, front.TOrderStatePaid); err != nil {
+		err = cerr.NoWayToPaidState
+		return
 	}
 	if order.PayAmount != payload.Amount {
-		return nil, cerr.InvalidPayAmount
+		err = cerr.InvalidPayAmount
+		return
 	}
 
 	now := time.Now().Unix()
 
 	if payload.Cash != 0 {
-		if !lok.CashLok.Lock(tokUsr.ID) {
-			return nil, cerr.CashTmpLocked
+		if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+			return cerr.CashTmpLocked
 		}
-		defer lok.CashLok.Unlock(tokUsr.ID)
 
 		var flow front.CapitalFlow
 		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 		if err = db.DsSelectOneTo(&flow, ds); err != nil {
-			return nil, err
+			return
 		}
 
 		if flow.Balance < int(payload.Cash) {
-			return nil, cerr.NotEnoughMoney
+			err = cerr.NotEnoughMoney
+			return
 		}
 
 		err = db.Save(&front.CapitalFlow{
@@ -638,24 +593,25 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 			OrderID:   order.ID,
 		})
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 
 	if payload.Points != 0 {
-		if !lok.PointsLok.Lock(tokUsr.ID) {
-			return nil, cerr.CashTmpLocked
+		if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+			err = cerr.PointsTmpLocked
+			return
 		}
-		defer lok.PointsLok.Unlock(tokUsr.ID)
 
 		var points front.PointsItem
 		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 		if err = db.DsSelectOneTo(&points, ds); err != nil {
-			return nil, err
+			return
 		}
 
 		if points.Balance < int(payload.Points) {
-			return nil, cerr.NotEnoughPoints
+			err = cerr.NotEnoughPoints
+			return
 		}
 
 		err = db.Save(&front.PointsItem{
@@ -667,7 +623,7 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 			OrderID:   order.ID,
 		})
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 
@@ -675,31 +631,27 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 	order.PointsPaid = pointsPaid
 	order.State = front.TOrderStatePaid
 	order.PaidAt = now
-	if err = db.UpdateColumns(&order, "CashPaid", "PointsPaid", "State", "PaidAt"); err != nil {
-		return nil, err
-	}
-
-	return &order, tx.Commit()
+	err = db.UpdateColumns(order, "CashPaid", "PointsPaid", "State", "PaidAt")
+	return
 }
 
 // TOrderStateEvaled is standalone
 func (dbs *DbService) OrderChangeState(
 	order *front.Order, tokUsr *models.User, payload *front.OrderChangeStatePayload, paier WxPaier,
-) error {
+) (cashLocked, pointsLocked bool, err error) {
 
 	db := dbs.GetDB()
 
 	// lock order before tx
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.ID)).
-		Where(goqu.I("$CreatedAt").Eq(payload.CreatedAt)).
-		Where(goqu.I("$UserID").Eq(tokUsr.ID))
-	err := db.DsSelectOneTo(order, ds)
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.ID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	err = db.DsSelectOneTo(order, ds)
 	if err != nil {
-		return err
+		return
 	}
 
 	if err = PermitOrderState(order, payload.State); err != nil {
-		return cerr.NoWayToTargetState
+		err = cerr.NoWayToTargetState
+		return
 	}
 
 	now := time.Now().Unix()
@@ -709,115 +661,113 @@ func (dbs *DbService) OrderChangeState(
 		case front.TOrderStateNopay:
 			order.State = front.TOrderStateCanceled
 			order.CanceledAt = now
-			return db.UpdateColumns(order, "CanceledAt", "State")
+			err = db.UpdateColumns(order, "CanceledAt", "State")
+			return
 		case front.TOrderStatePrepaid:
-			res, err := paier.OrderClose(order)
+			if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+				err = cerr.CashTmpLocked
+				return
+			}
+
+			var flow front.CapitalFlow
+			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
+			if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
+				return
+			}
+			if flow.ID != 0 {
+				// repaid
+				var flow2 front.CapitalFlow
+				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepayBack))
+				if err = db.DsSelectOneTo(&flow2, ds); err != nil && err != reform.ErrNoRows {
+					return
+				}
+				if flow2.ID == 0 {
+					// not refund yet
+					var flow1 front.CapitalFlow
+					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+					if err = db.DsSelectOneTo(&flow1, ds); err != nil {
+						return
+					}
+					// refund
+					err = db.Save(&front.CapitalFlow{
+						UserID:    tokUsr.ID,
+						CreatedAt: now,
+						Type:      front.TCapitalFlowPrepayBack, // Trade type
+						Amount:    -flow.Amount,
+						Balance:   flow1.Balance - flow.Amount,
+						OrderID:   order.ID,
+					})
+					if err != nil {
+						return
+					}
+				}
+			}
+
+			if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+				err = cerr.PointsTmpLocked
+				return
+			}
+
+			var points front.PointsItem
+			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
+			if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
+				return
+			}
+			if points.ID != 0 {
+				// repaid
+				var points2 front.PointsItem
+				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepayBack))
+				if err = db.DsSelectOneTo(&points2, ds); err != nil && err != reform.ErrNoRows {
+					return
+				}
+				if points2.ID == 0 {
+					// not refund yet
+					var points1 front.PointsItem
+					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+					if err = db.DsSelectOneTo(&points1, ds); err != nil {
+						return
+					}
+					// refund
+					err = db.Save(&front.PointsItem{
+						UserID:    tokUsr.ID,
+						CreatedAt: now,
+						Type:      front.TPointsPrepayBack, // Trade type
+						Amount:    -points.Amount,
+						Balance:   points1.Balance - points.Amount,
+						OrderID:   order.ID,
+					})
+					if err != nil {
+						return
+					}
+				}
+			}
+
+			order.State = front.TOrderStateCanceled
+			order.CanceledAt = now
+			err = db.UpdateColumns(order, "CanceledAt", "State")
 			if err != nil {
-				return err
+				return
 			}
-			if res["result_code"] == "SUCCESS" {
-				if !lok.CashLok.Lock(tokUsr.ID) {
-					return cerr.CashTmpLocked
-				}
-				defer lok.CashLok.Unlock(tokUsr.ID)
 
-				var flow front.CapitalFlow
-				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
-				if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-					return err
-				}
-				if flow.ID != 0 {
-					// repaid
-					var flow2 front.CapitalFlow
-					ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepayBack))
-					if err = db.DsSelectOneTo(&flow2, ds); err != nil && err != reform.ErrNoRows {
-						return err
-					}
-					if flow2.ID == 0 {
-						// not refund yet
-						var flow1 front.CapitalFlow
-						ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
-						if err = db.DsSelectOneTo(&flow1, ds); err != nil {
-							return err
-						}
-						// refund
-						err = db.Save(&front.CapitalFlow{
-							UserID:    tokUsr.ID,
-							CreatedAt: now,
-							Type:      front.TCapitalFlowPrepayBack, // Trade type
-							Amount:    -flow.Amount,
-							Balance:   flow1.Balance - flow.Amount,
-							OrderID:   order.ID,
-						})
-						if err != nil {
-							return err
-						}
-					}
-				}
-
-				if !lok.PointsLok.Lock(tokUsr.ID) {
-					return cerr.CashTmpLocked
-				}
-				defer lok.PointsLok.Unlock(tokUsr.ID)
-
-				var points front.PointsItem
-				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
-				if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
-					return err
-				}
-				if points.ID != 0 {
-					// repaid
-					var points2 front.PointsItem
-					ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepayBack))
-					if err = db.DsSelectOneTo(&points2, ds); err != nil && err != reform.ErrNoRows {
-						return err
-					}
-					if points2.ID == 0 {
-						// not refund yet
-						var points1 front.PointsItem
-						ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
-						if err = db.DsSelectOneTo(&points1, ds); err != nil {
-							return err
-						}
-						// refund
-						err = db.Save(&front.PointsItem{
-							UserID:    tokUsr.ID,
-							CreatedAt: now,
-							Type:      front.TPointsPrepayBack, // Trade type
-							Amount:    -points.Amount,
-							Balance:   points1.Balance - points.Amount,
-							OrderID:   order.ID,
-						})
-						if err != nil {
-							return err
-						}
-					}
-				}
-
-				order.State = front.TOrderStateCanceled
-				order.CanceledAt = now
-				err = db.UpdateColumns(order, "CanceledAt", "State", "TransactionId", "TradeState")
-				if err != nil {
-					return err
-				}
-
-				res, err := closeWxOrder(order)
-				if err != nil {
-					return err
-				}
-
-				if res["result_code"] != "SUCCESS" {
-					switch res["err_code"] {
-					case "ORDERPAID":
-						return cerr.WxOrderAlreadyPaid
-					case "SYSTEMERROR":
-						return cerr.WxSystemFailed
-					case "SIGNERROR", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
-						return cerr.ApiImplementFailed
-					}
-				}
-				return nil
+			// TOrderStatePrepaid indecate there must be an incompleted wx order
+			var res map[string]string
+			res, err = paier.OrderClose(order)
+			if err != nil {
+				return
 			}
+
+			if res["result_code"] != "SUCCESS" {
+				switch res["err_code"] {
+				case "ORDERPAID":
+					err = cerr.WxOrderAlreadyPaid
+				case "SYSTEMERROR":
+					err = cerr.WxSystemFailed
+				case "SIGNERROR", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
+					err = cerr.ApiImplementFailed
+				}
+			}
+			return
+
 		case front.TOrderStatePaid, front.TOrderStatePicking:
 			if order.CashRefund == 0 {
 				order.CashRefund = order.CashPaid
@@ -828,51 +778,57 @@ func (dbs *DbService) OrderChangeState(
 			if order.WxRefund == 0 {
 				order.WxRefund = order.WxPaid
 			}
-			return dbs.orderRefund(claims.UserId, order, func(refundIdSet bool) error {
-				order.State = front.TOrderStateCanceled
-				order.CanceledAt = now
-				if refundIdSet {
-					return db.UpdateColumns(order, refundCol, "State", "CanceledAt", "WxRefundID")
-				}
-				return db.UpdateColumns(order, refundCol, "State", "CanceledAt")
-			})
+			cashLocked, pointsLocked, err = dbs.orderRefund(payload.ID, order)
+			if err != nil {
+				return
+			}
+			order.State = front.TOrderStateCanceled
+			order.CanceledAt = now
+			err = db.UpdateColumns(order, refundCol, "State", "CanceledAt", "WxRefundID")
+			return
 		} // to cancel end
 
 	case front.TOrderStateCompleted:
 		if dbs.IsOrderCompleted(order) {
-			return cerr.OrderCompleteTimeout
+			err = cerr.OrderCompleteTimeout
+			return
 		}
 		order.State = front.TOrderStateCompleted
 		order.CompletedAt = now
-		return db.UpdateColumns(order, "CompletedAt", "State")
+		err = db.UpdateColumns(order, "CompletedAt", "State")
+		return
 
 	case front.TOrderStateReturnStarted:
 		if dbs.IsOrderCompleted(order) {
-			return cerr.OrderCompleteTimeout
+			err = cerr.OrderCompleteTimeout
+			return
 		}
 		order.State = front.TOrderStateReturnStarted
 		order.ReturnStaredtAt = now
-		return db.UpdateColumns(order, "ReturnStaredtAt", "State")
+		err = db.UpdateColumns(order, "ReturnStaredtAt", "State")
+		return
 
 	}
 
-	return cerr.Forbidden
+	err = cerr.Forbidden
+	return
 }
 
-func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, paier WxPaier) error {
+func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, paier WxPaier) (cashLocked, pointsLocked bool, err error) {
 	db := dbs.GetDB()
 
 	// lock order before tx
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(claims.OrderID))
 	//		Where(goqu.I("$CreatedAt").Eq(payload.CreatedAt)).
 	//		Where(goqu.I("$UserID").Eq(tokUsr.ID))
-	err := db.DsSelectOneTo(order, ds)
+	err = db.DsSelectOneTo(order, ds)
 	if err != nil {
-		return err
+		return
 	}
 
 	if err = PermitOrderState(order, claims.State); err != nil {
-		return cerr.NoWayToTargetState
+		err = cerr.NoWayToTargetState
+		return
 	}
 
 	var refundCol string
@@ -881,29 +837,29 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 	case front.TOrderStatePicking:
 		order.State = front.TOrderStatePicking
 		order.PickingAt = now
-		return db.UpdateColumns(order, "PickingAt", "State")
+		err = db.UpdateColumns(order, "PickingAt", "State")
 
 	case front.TOrderStateDelivered:
 		order.State = front.TOrderStateDelivered
 		order.DeliveredAt = now
 		order.DeliverCom = claims.DeliverCom
 		order.DeliverNo = claims.DeliverNo
-		return db.UpdateColumns(order, "DeliveredAt", "State", "DeliverCom", "DeliverNo")
+		err = db.UpdateColumns(order, "DeliveredAt", "State", "DeliverCom", "DeliverNo")
 
 	case front.TOrderStateRejecting:
 		order.State = front.TOrderStateRejecting
 		order.RejectingAt = now
-		return db.UpdateColumns(order, "RejectingAt", "State")
+		err = db.UpdateColumns(order, "RejectingAt", "State")
 
 	case front.TOrderStateRejectBack:
 		order.State = front.TOrderStateRejectBack
 		order.RejectBackAt = now
-		return db.UpdateColumns(order, "RejectBackAt", "State")
+		err = db.UpdateColumns(order, "RejectBackAt", "State")
 
 	case front.TOrderStateReturning:
 		order.State = front.TOrderStateReturning
 		order.ReturnEnsuredAt = now
-		return db.UpdateColumns(order, "ReturnEnsuredAt", "State")
+		err = db.UpdateColumns(order, "ReturnEnsuredAt", "State")
 
 	case front.TOrderStateRejectRefound:
 		order.State = front.TOrderStateRejectRefound
@@ -914,39 +870,43 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 		order.ReturnedAt = now
 		refundCol = "ReturnedAt"
 	default:
-		return cerr.NoWayToTargetState
+		err = cerr.NoWayToTargetState
+	}
+
+	if err != nil {
+		return
 	}
 
 	order.CashRefund = claims.CashRefund
 	order.PointsRefund = claims.PointsRefund
 	order.WxRefund = claims.WxRefund
-	return dbs.orderRefund(claims.UserId, order, func(refundIdSet bool) error {
-		if refundIdSet {
-			return db.UpdateColumns(order, refundCol, "State", "WxRefundID")
-		}
-		return db.UpdateColumns(order, refundCol, "State")
-	})
+
+	cashLocked, pointsLocked, err = dbs.orderRefund(claims.UserId, order)
+	if err == nil {
+		err = db.UpdateColumns(order, refundCol, "State", "WxRefundID")
+	}
+	return
 }
 
 // called just before commit of tx
-func (dbs *DbService) orderRefund(userId uint, order *front.Order, afterRefund func(refundIdSet bool) error) error {
+func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, pointsLocked bool, err error) {
 	if order.CashRefund != 0 {
-		if !lok.CashLok.Lock(userId) {
-			return cerr.CashTmpLocked
+		if cashLocked = lok.CashLok.Lock(userId); !cashLocked {
+			err = cerr.CashTmpLocked
+			return
 		}
-		defer lok.CashLok.Unlock(userId)
 
 		var flow front.CapitalFlow
 		ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowRefund))
 		if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-			return err
+			return
 		}
 		if flow.ID == 0 {
 			// not refund yet
 			var flow1 front.CapitalFlow
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 			if err = db.DsSelectOneTo(&flow1, ds); err != nil {
-				return err
+				return
 			}
 			// refund
 			err = db.Save(&front.CapitalFlow{
@@ -958,28 +918,28 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order, afterRefund f
 				OrderID:   order.ID,
 			})
 			if err != nil {
-				return err
+				return
 			}
 		}
 	}
 
 	if order.PointsRefund != 0 {
-		if !lok.PointsLok.Lock(userId) {
-			return cerr.CashTmpLocked
+		if pointsLocked = lok.PointsLok.Lock(userId); !pointsLockedlok {
+			err = cerr.PointsTmpLocked
+			return
 		}
-		defer lok.PointsLok.Unlock(userId)
 
 		var points front.PointsItem
 		ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsRefund))
 		if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
-			return err
+			return
 		}
 		if points.ID == 0 {
 			// not refund yet
 			var points1 front.PointsItem
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
 			if err = db.DsSelectOneTo(&points1, ds); err != nil {
-				return err
+				return
 			}
 			// refund
 			err = db.Save(&front.PointsItem{
@@ -991,16 +951,16 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order, afterRefund f
 				OrderID:   order.ID,
 			})
 			if err != nil {
-				return err
+				return
 			}
 		}
 	}
 
-	var refundIdSet bool
 	if order.WxRefund != 0 {
-		res, err := paier.OrderRefund(order, strconv.Itoa(int(userId)))
+		var res map[string]string
+		res, err = paier.OrderRefund(order, strconv.Itoa(int(userId)))
 		if err != nil {
-			return err
+			return
 		}
 
 		if res["result_code"] != "SUCCESS" {
@@ -1015,19 +975,20 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order, afterRefund f
 				//						"APPID_MCHID_NOT_MATCH", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
 				//						return cerr.ApiImplementFailed
 			}
-			return cerr.ApiImplementFailed
+			err = cerr.ApiImplementFailed
+			return
 		}
 
 		order.WxRefundID = res["refund_id"]
-		refundIdSet = true
 	}
 
-	return afterRefund(refundIdSet)
+	err = nil
+	return
 }
 
-func (dbs *DbService) GetBareOrder(id uint, at int64) (*front.Order, error) {
+func (dbs *DbService) GetBareOrder(id uint) (*front.Order, error) {
 	var order front.Order
-	ds := dbs.DS.Where(goqu.I("$CreatedAt").Eq(at), goqu.I(front.OrderTable.PK()).Eq(id))
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(id))
 	return &order, dbs.GetDB().DsSelectOneTo(&order, ds)
 }
 

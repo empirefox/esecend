@@ -8,7 +8,6 @@ import (
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/lok"
-	"github.com/empirefox/esecend/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,16 +30,13 @@ func (s *Server) PostOrderPrepay(c *gin.Context) {
 	if err := c.BindJSON(&payload); Abort(c, err) {
 		return
 	}
+	payload.Ip = c.ClientIP()
 
-	tokUsr := s.TokenUser(c)
-	args, err := s.DB.PrepayOrder(
-		tokUsr,
-		&payload,
-		func(order *front.Order, attach *models.UnifiedOrderAttach) (*front.WxPayArgs, error) {
-			return s.WxClient.UnifiedOrder(tokUsr, order, c.ClientIP(), attach)
-		},
-		s.WxClient.OrderClose,
-	)
+	var args *front.WxPayArgs
+	err := s.LockOrderTx(payload.OrderID, func() (cashLocked, pointsLocked bool, err error) {
+		args, cashLocked, pointsLocked, err = s.DB.PrepayOrder(s.TokenUser(c), &payload, s.WxClient)
+		return
+	})
 	if Abort(c, err) {
 		return
 	}
@@ -54,7 +50,10 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 		return
 	}
 
-	order, err := s.DB.PayOrder(s.TokenUser(c), &payload)
+	var order front.Order
+	err := s.LockOrderTx(claims.OrderID, func() (cashLocked, pointsLocked bool, err error) {
+		return s.DB.PayOrder(&order, s.TokenUser(c), &payload)
+	})
 	if Abort(c, err) {
 		return
 	}
@@ -64,14 +63,11 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 }
 
 func (s *Server) PostMgrOrderState(c *gin.Context) {
-	if !lok.OrderLok.Lock(payload.OrderID) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
+	claims := s.AdminClaims(c)
 
 	var order front.Order
-	err := s.DB.InTx(func(tx *dbsrv.DbService) error {
-		return s.DB.MgrOrderState(&order, s.AdminClaims(c), s.WxClient)
+	err := s.LockOrderTx(claims.OrderID, func() (cashLocked, pointsLocked bool, err error) {
+		return s.DB.MgrOrderState(&order, claims, s.WxClient)
 	})
 	if Abort(c, err) {
 		return
@@ -80,19 +76,37 @@ func (s *Server) PostMgrOrderState(c *gin.Context) {
 	c.JSON(http.StatusOK, &order)
 }
 
+func (s *Server) LockOrderTx(orderId uint, inTx func() (cashLocked, pointsLocked bool, err error)) (err error) {
+	if !lok.OrderLok.Lock(orderId) {
+		err = cerr.OrderTmpLocked
+		return
+	}
+
+	var cashLocked, pointsLocked bool
+	defer func() {
+		if cashLocked {
+			lok.CashLok.Unlock(claims.UserId)
+		}
+		if pointsLocked {
+			lok.PointsLok.Unlock(claims.UserId)
+		}
+		lok.OrderLok.Unlock(orderId)
+	}()
+
+	return s.DB.InTx(func(tx *dbsrv.DbService) (err error) {
+		cashLocked, pointsLocked, err = inTx()
+		return
+	})
+}
+
 func (s *Server) PostOrderState(c *gin.Context) {
 	var payload front.OrderChangeStatePayload
 	if err := c.BindJSON(&payload); Abort(c, err) {
 		return
 	}
 
-	if !lok.OrderLok.Lock(payload.OrderID) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
-
 	var order front.Order
-	err := s.DB.InTx(func(tx *dbsrv.DbService) error {
+	err := s.LockOrderTx(payload.ID, func() (cashLocked, pointsLocked bool, err error) {
 		return s.DB.OrderChangeState(&order, s.TokenUser(c), &payload, s.WxClient)
 	})
 	if Abort(c, err) {
