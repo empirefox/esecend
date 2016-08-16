@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
-	"gopkg.in/reform.v1"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/cznic/sortutil"
@@ -16,6 +15,7 @@ import (
 	"github.com/empirefox/esecend/l"
 	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
+	"github.com/empirefox/reform"
 )
 
 type WxPaier interface {

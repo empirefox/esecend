@@ -4,12 +4,12 @@ import (
 	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
-	"gopkg.in/reform.v1"
 
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
+	"github.com/empirefox/reform"
 )
 
 func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payload *front.EvalItem) (*front.EvalResponse, error) {
