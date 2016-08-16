@@ -71,4 +71,5 @@ const (
 	InvalidPrepayPayload
 	ApiImplementFailed
 	WxUserAbnormal
+	ParseWxTotalFeeFailed
 )

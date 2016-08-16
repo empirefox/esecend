@@ -21,6 +21,7 @@ import (
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/esecend/l"
 	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
 )
@@ -114,11 +115,22 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 	defer lok.OrderLok.Unlock(payload.OrderID)
 
 	err = wc.dbs.InTx(func(dbs *dbsrv.DbService) error {
-		order, err := dbs.GetBareOrder(id)
+		order, err := dbs.GetBareOrder(nil, id)
 		if err != nil {
 			return err
 		}
-		return wc.updateWxOrderSate(dbs, order, m)
+		var cashLocked, pointsLocked bool
+		defer func() {
+			if cashLocked {
+				lok.CashLok.Unlock(claims.UserId)
+			}
+			if pointsLocked {
+				lok.PointsLok.Unlock(claims.UserId)
+			}
+			lok.OrderLok.Unlock(orderId)
+		}()
+		cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, m)
+		return err
 	})
 
 	// must trans to WxReponse
@@ -129,124 +141,125 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 	return NewWxResponse("SUCCESS", "")
 }
 
-func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, src map[string]string) error {
+func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, src map[string]string) (cashLocked, pointsLocked bool, err error) {
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
 	if order.TradeState == tradeState && order.TransactionId == tid {
 		// no need update
-		return nil
+		return
 	}
 
-	//	if err = dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
-	//		return cerr.NoWayToPaidState
-	//	}
-
-	totalFee64, err := strconv.ParseUint(src["total_fee"], 10, 64)
-	if err != nil {
-		return err
+	totalFee64, _ := strconv.ParseUint(src["total_fee"], 10, 64)
+	if totalFee64 == 0 {
+		err = cerr.ParseWxTotalFeeFailed
+		return
 	}
 	totalFee := uint(totalFee64)
 
 	var attach models.UnifiedOrderAttach
 	attachB64, hasAttach := src["attach"]
 	if hasAttach {
-		attachBs, err := base64.URLEncoding.DecodeString(attachB64)
+		var attachBs []byte
+		attachBs, err = base64.URLEncoding.DecodeString(attachB64)
 		if err != nil {
-			return err
+			return
 		}
 
 		err = json.Unmarshal(attachBs, &attach)
 		if err != nil {
-			return err
+			return
 		}
 
 		if attach.CashPaid != order.CashPaid || attach.PointsPaid != order.PointsPaid {
-			return cerr.InvalidPayAmount
+			err = cerr.InvalidPayAmount
+			return
 		}
 	}
 
 	switch tradeState {
 	case front.SUCCESS:
-		if dbsrv.PermitOrderState(order, front.TOrderStatePaid) == nil {
-			if hasAttach && order.State == front.TOrderStatePrepaid {
-				now := time.Now().Unix()
-				if attach.PreCashID != 0 {
-					if !lok.CashLok.Lock(tokUsr.ID) {
-						return cerr.CashTmpLocked
-					}
-					defer lok.CashLok.Unlock(tokUsr.ID)
-
-					ds := dbs.DS.Where(goqu.I(front.CapitalFlowTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-					_, err = dbs.GetDB().DsUpdateColumns(&front.CapitalFlow{
-						Type:      front.TCapitalFlowTrade,
-						CreatedAt: now,
-					}, ds, "Type", "CreatedAt")
-					if err != nil {
-						return err
-					}
-				}
-
-				if attach.PrePointsID != 0 {
-					if !lok.PointsLok.Lock(tokUsr.ID) {
-						return cerr.CashTmpLocked
-					}
-					defer lok.PointsLok.Unlock(tokUsr.ID)
-
-					ds := dbs.DS.Where(goqu.I(front.PointsItemTable.PK()).Eq(attach.PrePointsID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-					_, err = dbs.GetDB().DsUpdateColumns(&front.PointsItem{
-						Type:      front.TPointsTrade,
-						CreatedAt: now,
-					}, ds, "Type", "CreatedAt")
-					if err != nil {
-						return err
-					}
-				}
-			}
-
-			timeEnd, err := time.Parse("20060102150405", src["time_end"])
-			if err != nil {
-				timeEnd = time.Now()
-			}
-
-			data := front.Order{
-				ID:            order.ID,
-				TransactionId: tid,
-				TradeState:    tradeState,
-				State:         front.TOrderStatePaid,
-				PaidAt:        timeEnd.Unix(),
-			}
-			err = dbs.GetDB().UpdateColumns(&data, "TransactionId", "TradeState", "State", "PaidAt")
-			if err != nil {
-				return err
-			}
-			order.TransactionId = data.TransactionId
-			order.TradeState = data.TradeState
-			order.State = data.State
-			order.PaidAt = data.PaidAt
+		if err != dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
+			log.WithFields(l.Locate(logrus.Fields{
+				"OrderID": order.ID,
+				"State":   order.State,
+			})).Info("Got wxpay with SUCCESS")
+			return
 		}
+		if hasAttach && order.State == front.TOrderStatePrepaid {
+			now := time.Now().Unix()
+			if attach.PreCashID != 0 {
+				if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+					return cerr.CashTmpLocked
+				}
+
+				ds := dbs.DS.Where(goqu.I(front.CapitalFlowTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
+				_, err = dbs.GetDB().DsUpdateColumns(&front.CapitalFlow{
+					Type:      front.TCapitalFlowTrade,
+					CreatedAt: now,
+				}, ds, "Type", "CreatedAt")
+				if err != nil {
+					return
+				}
+			}
+
+			if attach.PrePointsID != 0 {
+				if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+					return cerr.CashTmpLocked
+				}
+
+				ds := dbs.DS.Where(goqu.I(front.PointsItemTable.PK()).Eq(attach.PrePointsID)).Where(goqu.I("$UserID").Eq(attach.UserID))
+				_, err = dbs.GetDB().DsUpdateColumns(&front.PointsItem{
+					Type:      front.TPointsTrade,
+					CreatedAt: now,
+				}, ds, "Type", "CreatedAt")
+				if err != nil {
+					return
+				}
+			}
+		}
+
+		timeEnd, errTime := time.Parse("20060102150405", src["time_end"])
+		if errTime != nil {
+			timeEnd = time.Now()
+		}
+
+		data := front.Order{
+			ID:            order.ID,
+			TransactionId: tid,
+			TradeState:    tradeState,
+			State:         front.TOrderStatePaid,
+			PaidAt:        timeEnd.Unix(),
+		}
+		err = dbs.GetDB().UpdateColumns(&data, "TransactionId", "TradeState", "State", "PaidAt")
+		if err != nil {
+			return
+		}
+		order.TransactionId = data.TransactionId
+		order.TradeState = data.TradeState
+		order.State = data.State
+		order.PaidAt = data.PaidAt
 
 	case front.REFUND, front.USERPAYING, front.PAYERROR:
 		err = dbs.GetDB().UpdateColumns(&front.Order{ID: order.ID, TradeState: tradeState}, "TradeState")
-		if err != nil {
-			return err
+		if err == nil {
+			order.TradeState = tradeState
 		}
-		order.TradeState = tradeState
-		return nil
 
 	case front.CLOSED:
 		// must be an expired order, ignore
 		// refound must be called with SUCCESS on closeorder
 		// web must refresh!
-		return cerr.OrderClosed
+		err = cerr.OrderClosed
 	}
 
-	return nil
+	return
 }
 
-func (wc *WxClient) UpdateWxOrderSate(dbs *dbsrv.DbService, order *front.Order) error {
-	res, err := wc.OrderQuery(order)
+func (wc *WxClient) UpdateWxOrderSate(dbs *dbsrv.DbService, order *front.Order) (cashLocked, pointsLocked bool, err error) {
+	var res map[string]string
+	res, err = wc.OrderQuery(order)
 	if err != nil {
-		return err
+		return
 	}
 
 	return wc.updateWxOrderSate(dbs, order, res)

@@ -986,9 +986,12 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, 
 	return
 }
 
-func (dbs *DbService) GetBareOrder(id uint) (*front.Order, error) {
+func (dbs *DbService) GetBareOrder(tokUsr *models.User, id uint) (*front.Order, error) {
 	var order front.Order
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(id))
+	if tokUsr != nil {
+		ds = ds.Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	}
 	return &order, dbs.GetDB().DsSelectOneTo(&order, ds)
 }
 

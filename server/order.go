@@ -76,29 +76,6 @@ func (s *Server) PostMgrOrderState(c *gin.Context) {
 	c.JSON(http.StatusOK, &order)
 }
 
-func (s *Server) LockOrderTx(orderId uint, inTx func() (cashLocked, pointsLocked bool, err error)) (err error) {
-	if !lok.OrderLok.Lock(orderId) {
-		err = cerr.OrderTmpLocked
-		return
-	}
-
-	var cashLocked, pointsLocked bool
-	defer func() {
-		if cashLocked {
-			lok.CashLok.Unlock(claims.UserId)
-		}
-		if pointsLocked {
-			lok.PointsLok.Unlock(claims.UserId)
-		}
-		lok.OrderLok.Unlock(orderId)
-	}()
-
-	return s.DB.InTx(func(tx *dbsrv.DbService) (err error) {
-		cashLocked, pointsLocked, err = inTx()
-		return
-	})
-}
-
 func (s *Server) PostOrderState(c *gin.Context) {
 	var payload front.OrderChangeStatePayload
 	if err := c.BindJSON(&payload); Abort(c, err) {
@@ -123,26 +100,19 @@ func (s *Server) GetPaidOrder(c *gin.Context) {
 		return
 	}
 
-	if !lok.OrderLok.Lock(payload.OrderID) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
-
-	s.DB.InTx(func(dbs *dbsrv.DbService) error {
-		order, err := dbs.GetOrder1(s.TokenUser(c), uint(id))
-		if Abort(c, err) {
-			return err
+	var order *front.Order
+	err := s.LockOrderTx(id, func() (cashLocked, pointsLocked bool, err error) {
+		order, err = s.DB.GetBareOrder(s.TokenUser(c), uint(id))
+		if err != nil {
+			return
 		}
-
-		if err = s.WxClient.UpdateWxOrderSate(dbs, order); err != nil {
-			front.NewCodeErrv(cerr.UpdateWxOrderStateFailed, err).Abort(c, http.StatusInternalServerError)
-			return err
-		}
-
-		c.JSON(http.StatusOK, order)
-		return nil
+		return s.WxClient.UpdateWxOrderSate(dbs, order)
 	})
+	if Abort(c, err) {
+		return
+	}
 
+	c.JSON(http.StatusOK, order)
 }
 
 func (s *Server) GetOrder(c *gin.Context) {
@@ -158,4 +128,27 @@ func (s *Server) GetOrder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) LockOrderTx(orderId uint, inTx func() (cashLocked, pointsLocked bool, err error)) (err error) {
+	if !lok.OrderLok.Lock(orderId) {
+		err = cerr.OrderTmpLocked
+		return
+	}
+
+	var cashLocked, pointsLocked bool
+	defer func() {
+		if cashLocked {
+			lok.CashLok.Unlock(claims.UserId)
+		}
+		if pointsLocked {
+			lok.PointsLok.Unlock(claims.UserId)
+		}
+		lok.OrderLok.Unlock(orderId)
+	}()
+
+	return s.DB.InTx(func(tx *dbsrv.DbService) (err error) {
+		cashLocked, pointsLocked, err = inTx()
+		return
+	})
 }
