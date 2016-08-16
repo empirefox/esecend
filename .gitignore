@@ -25,3 +25,7 @@ _testmain.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+*_reform.go
+*_list.go
+*_mapconst.go
