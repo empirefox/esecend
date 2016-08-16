@@ -33,6 +33,7 @@ const (
 	InvalidTokenExpires
 	InvalidSignAlg
 	InvalidClaimId
+	InvalidUserID
 	Forbidden
 
 	InvalidProductId

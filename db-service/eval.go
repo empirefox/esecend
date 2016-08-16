@@ -30,39 +30,39 @@ func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payloa
 	payload.EvalName = string(name)
 	payload.EvalAt = time.Now().Unix()
 
-	if !lok.OrderLok.Lock(payload.OrderID) {
+	if !lok.OrderLok.Lock(orderId) {
 		return nil, cerr.OrderTmpLocked
 	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
+	defer lok.OrderLok.Unlock(orderId)
 
 	var order front.Order
 	var ra uint
 	err := dbs.InTx(func(tx *DbService) error {
-		ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).
-			Where(goqu.I("$CreatedAt").Eq(payload.CreatedAt)).
-			Where(goqu.I("$UserID").Eq(tokUsr.ID))
+		db := tx.GetDB()
+
+		ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(orderId)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
 		err := db.DsSelectOneTo(&order, ds)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// TOrderStateEvalStarted included
-		if err := PermitOrderState(order, front.TOrderStateEvaled); err != nil {
-			return nil, cerr.NoWayToTargetState
+		if err := PermitOrderState(&order, front.TOrderStateEvaled); err != nil {
+			return cerr.NoWayToTargetState
 		}
 
 		if dbs.IsEvalTimeout(&order) {
 			return cerr.OrderEvalTimeout
 		}
 
-		ds = dbs.DS.Where(goqu.I(goqu.I("$UserID")).Eq(tokUsr.ID))
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID))
 		if itemId == 0 {
-			ds = ds.Where(goqu.I(goqu.I("$OrderID")).Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
+			ds = ds.Where(goqu.I("$OrderID").Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
 		} else {
 			ds = ds.Where(goqu.I(front.OrderItemTable.PK()).Eq(itemId))
 		}
 
-		ra, err = tx.GetDB().DsUpdateStruct(payload, ds)
+		ra, err = db.DsUpdateStruct(payload, ds)
 		if err != nil {
 			return err
 		}
@@ -71,8 +71,8 @@ func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payloa
 		if itemId == 0 || order.EvalAt != 0 {
 			evalOrder = true
 		} else {
-			ds = ds.Where(goqu.I(goqu.I("$OrderID")).Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
-			unevaled, err := tx.GetDB().DsCount(front.OrderItemTable, ds)
+			ds = ds.Where(goqu.I("$OrderID").Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
+			unevaled, err := db.DsCount(front.OrderItemTable, ds)
 			if err != nil && err != reform.ErrNoRows {
 				return err
 			}
@@ -95,7 +95,7 @@ func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payloa
 					cols = append(cols, "State")
 				}
 			}
-			return tx.GetDB().UpdateColumns(&order, cols...)
+			return db.UpdateColumns(&order, cols...)
 		}
 		return nil
 	})

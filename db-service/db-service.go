@@ -3,6 +3,7 @@ package dbsrv
 import (
 	"database/sql"
 	"fmt"
+	slog "log"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -41,7 +42,7 @@ func NewDbService(config *config.Config, isDebug bool) (*DbService, error) {
 
 	var reformLogger reform.Logger
 	if isDebug {
-		reformLogger = reform.NewPrintfLogger(log.New(os.Stderr, "SQL: ", 0).Printf)
+		reformLogger = reform.NewPrintfLogger(slog.New(os.Stderr, "SQL: ", 0).Printf)
 	}
 
 	ds := new(goqu.Dataset)

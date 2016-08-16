@@ -297,7 +297,7 @@ func (tx *DbService) prepayOrderAfterClosedWxOrder(
 		return
 	}
 
-	if uint(-flow.Amount) == order.CashPaid && uint(-points.Amount)*dbs.config.Order.Point2Cent == order.PointsPaid {
+	if uint(-flow.Amount) == order.CashPaid && uint(-points.Amount)*tx.config.Order.Point2Cent == order.PointsPaid {
 		// no need prepay again
 
 		if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
@@ -352,11 +352,12 @@ func (dbs *DbService) PrepayOrder(
 	// prepay after prepaid
 	if order.State == front.TOrderStatePrepaid {
 		if order.CashPaid != payload.Cash || pointsPaid != order.PointsPaid {
-			return nil, InvalidPrepayPayload
+			err = cerr.InvalidPrepayPayload
+			return
 		}
 		// close transaction_id firstly
 		var res map[string]string
-		res, err = paier.OrderClose(order)
+		res, err = paier.OrderClose(&order)
 		if err != nil {
 			return
 		}
@@ -409,7 +410,7 @@ func (dbs *DbService) PrepayOrder(
 		} else {
 			// colse FAIL
 			log.WithFields(l.Locate(logrus.Fields{
-				"out_trade_no": outTradeNo,
+				"out_trade_no": order.TrackingNumber(),
 				"err_code":     res["err_code"],
 			})).Info("Failed to close")
 
@@ -544,6 +545,8 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		return
 	}
 
+	db := dbs.GetDB()
+
 	if err = db.Reload(tokUsr); err != nil {
 		return
 	}
@@ -570,7 +573,8 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 
 	if payload.Cash != 0 {
 		if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
-			return cerr.CashTmpLocked
+			err = cerr.CashTmpLocked
+			return
 		}
 
 		var flow front.CapitalFlow
@@ -778,13 +782,13 @@ func (dbs *DbService) OrderChangeState(
 			if order.WxRefund == 0 {
 				order.WxRefund = order.WxPaid
 			}
-			cashLocked, pointsLocked, err = dbs.orderRefund(payload.ID, order)
+			cashLocked, pointsLocked, err = dbs.orderRefund(0, tokUsr.ID, order, paier)
 			if err != nil {
 				return
 			}
 			order.State = front.TOrderStateCanceled
 			order.CanceledAt = now
-			err = db.UpdateColumns(order, refundCol, "State", "CanceledAt", "WxRefundID")
+			err = db.UpdateColumns(order, "State", "CanceledAt", "WxRefundID")
 			return
 		} // to cancel end
 
@@ -881,7 +885,7 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 	order.PointsRefund = claims.PointsRefund
 	order.WxRefund = claims.WxRefund
 
-	cashLocked, pointsLocked, err = dbs.orderRefund(claims.UserId, order)
+	cashLocked, pointsLocked, err = dbs.orderRefund(claims.AminId, claims.UserId, order, paier)
 	if err == nil {
 		err = db.UpdateColumns(order, refundCol, "State", "WxRefundID")
 	}
@@ -889,7 +893,10 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 }
 
 // called just before commit of tx
-func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, pointsLocked bool, err error) {
+func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order, paier WxPaier) (cashLocked, pointsLocked bool, err error) {
+	db := dbs.GetDB()
+	now := time.Now().Unix()
+
 	if order.CashRefund != 0 {
 		if cashLocked = lok.CashLok.Lock(userId); !cashLocked {
 			err = cerr.CashTmpLocked
@@ -897,7 +904,7 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, 
 		}
 
 		var flow front.CapitalFlow
-		ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowRefund))
+		ds := dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowRefund))
 		if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
 			return
 		}
@@ -924,13 +931,13 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, 
 	}
 
 	if order.PointsRefund != 0 {
-		if pointsLocked = lok.PointsLok.Lock(userId); !pointsLockedlok {
+		if pointsLocked = lok.PointsLok.Lock(userId); !pointsLocked {
 			err = cerr.PointsTmpLocked
 			return
 		}
 
 		var points front.PointsItem
-		ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsRefund))
+		ds := dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsRefund))
 		if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
 			return
 		}
@@ -958,7 +965,10 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, 
 
 	if order.WxRefund != 0 {
 		var res map[string]string
-		res, err = paier.OrderRefund(order, strconv.Itoa(int(userId)))
+		if adminId == 0 {
+			adminId = userId
+		}
+		res, err = paier.OrderRefund(order, strconv.Itoa(int(adminId)))
 		if err != nil {
 			return
 		}
@@ -966,17 +976,20 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (cashLocked, 
 		if res["result_code"] != "SUCCESS" {
 			switch res["err_code"] {
 			case "SYSTEMERROR":
-				return cerr.WxSystemFailed
+				err = cerr.WxSystemFailed
 			case "USER_ACCOUNT_ABNORMAL":
-				return cerr.WxUserAbnormal
-				//					case "INVALID_TRANSACTIONID":
-				//						return cerr.WxSystemFailed
-				//					case "SIGNERROR", "PARAM_ERROR", "APPID_NOT_EXIST", "MCHID_NOT_EXIST",
-				//						"APPID_MCHID_NOT_MATCH", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
-				//						return cerr.ApiImplementFailed
+				err = cerr.WxUserAbnormal
+			//					case "INVALID_TRANSACTIONID":
+			//						return cerr.WxSystemFailed
+			//					case "SIGNERROR", "PARAM_ERROR", "APPID_NOT_EXIST", "MCHID_NOT_EXIST",
+			//						"APPID_MCHID_NOT_MATCH", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
+			//						return cerr.ApiImplementFailed
+			default:
+				err = cerr.ApiImplementFailed
 			}
-			err = cerr.ApiImplementFailed
-			return
+			if err != nil {
+				return
+			}
 		}
 
 		order.WxRefundID = res["refund_id"]

@@ -109,27 +109,28 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 		m["trade_state"] = "NOPAY"
 	}
 
-	if !lok.OrderLok.Lock(payload.OrderID) {
+	if !lok.OrderLok.Lock(id) {
 		return NewWxResponse("FAIL", "order is locked temporally")
 	}
-	defer lok.OrderLok.Unlock(payload.OrderID)
+	defer lok.OrderLok.Unlock(id)
+
+	var userId uint
+	var cashLocked, pointsLocked bool
+	defer func() {
+		if cashLocked {
+			lok.CashLok.Unlock(userId)
+		}
+		if pointsLocked {
+			lok.PointsLok.Unlock(userId)
+		}
+	}()
 
 	err = wc.dbs.InTx(func(dbs *dbsrv.DbService) error {
 		order, err := dbs.GetBareOrder(nil, id)
 		if err != nil {
 			return err
 		}
-		var cashLocked, pointsLocked bool
-		defer func() {
-			if cashLocked {
-				lok.CashLok.Unlock(claims.UserId)
-			}
-			if pointsLocked {
-				lok.PointsLok.Unlock(claims.UserId)
-			}
-			lok.OrderLok.Unlock(orderId)
-		}()
-		cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, m)
+		userId, cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, m, nil)
 		return err
 	})
 
@@ -141,7 +142,10 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 	return NewWxResponse("SUCCESS", "")
 }
 
-func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, src map[string]string) (cashLocked, pointsLocked bool, err error) {
+func (wc *WxClient) updateWxOrderSate(
+	dbs *dbsrv.DbService, order *front.Order, src map[string]string, tokUsr *models.User,
+) (userId uint, cashLocked, pointsLocked bool, err error) {
+
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
 	if order.TradeState == tradeState && order.TransactionId == tid {
@@ -154,7 +158,6 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 		err = cerr.ParseWxTotalFeeFailed
 		return
 	}
-	totalFee := uint(totalFee64)
 
 	var attach models.UnifiedOrderAttach
 	attachB64, hasAttach := src["attach"]
@@ -174,11 +177,16 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 			err = cerr.InvalidPayAmount
 			return
 		}
+		if attach.UserID != tokUsr.ID {
+			err = cerr.InvalidUserID
+			return
+		}
+		userId = attach.UserID
 	}
 
 	switch tradeState {
 	case front.SUCCESS:
-		if err != dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
+		if err = dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
 			log.WithFields(l.Locate(logrus.Fields{
 				"OrderID": order.ID,
 				"State":   order.State,
@@ -188,8 +196,9 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 		if hasAttach && order.State == front.TOrderStatePrepaid {
 			now := time.Now().Unix()
 			if attach.PreCashID != 0 {
-				if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
-					return cerr.CashTmpLocked
+				if cashLocked = lok.CashLok.Lock(attach.UserID); !cashLocked {
+					err = cerr.CashTmpLocked
+					return
 				}
 
 				ds := dbs.DS.Where(goqu.I(front.CapitalFlowTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
@@ -203,8 +212,9 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 			}
 
 			if attach.PrePointsID != 0 {
-				if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
-					return cerr.CashTmpLocked
+				if pointsLocked = lok.PointsLok.Lock(attach.UserID); !pointsLocked {
+					err = cerr.CashTmpLocked
+					return
 				}
 
 				ds := dbs.DS.Where(goqu.I(front.PointsItemTable.PK()).Eq(attach.PrePointsID)).Where(goqu.I("$UserID").Eq(attach.UserID))
@@ -225,6 +235,7 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 
 		data := front.Order{
 			ID:            order.ID,
+			WxPaid:        uint(totalFee64),
 			TransactionId: tid,
 			TradeState:    tradeState,
 			State:         front.TOrderStatePaid,
@@ -234,6 +245,7 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 		if err != nil {
 			return
 		}
+		order.WxPaid = data.WxPaid
 		order.TransactionId = data.TransactionId
 		order.TradeState = data.TradeState
 		order.State = data.State
@@ -255,14 +267,15 @@ func (wc *WxClient) updateWxOrderSate(dbs *dbsrv.DbService, order *front.Order, 
 	return
 }
 
-func (wc *WxClient) UpdateWxOrderSate(dbs *dbsrv.DbService, order *front.Order) (cashLocked, pointsLocked bool, err error) {
+func (wc *WxClient) UpdateWxOrderSate(tokUsr *models.User, dbs *dbsrv.DbService, order *front.Order) (cashLocked, pointsLocked bool, err error) {
 	var res map[string]string
 	res, err = wc.OrderQuery(order)
 	if err != nil {
 		return
 	}
 
-	return wc.updateWxOrderSate(dbs, order, res)
+	_, cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, res, tokUsr)
+	return
 }
 
 func (wc *WxClient) OrderQuery(order *front.Order) (map[string]string, error) {

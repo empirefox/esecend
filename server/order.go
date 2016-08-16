@@ -32,9 +32,11 @@ func (s *Server) PostOrderPrepay(c *gin.Context) {
 	}
 	payload.Ip = c.ClientIP()
 
+	tokUsr := s.TokenUser(c)
+
 	var args *front.WxPayArgs
-	err := s.LockOrderTx(payload.OrderID, func() (cashLocked, pointsLocked bool, err error) {
-		args, cashLocked, pointsLocked, err = s.DB.PrepayOrder(s.TokenUser(c), &payload, s.WxClient)
+	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		args, cashLocked, pointsLocked, err = tx.PrepayOrder(tokUsr, &payload, s.WxClient)
 		return
 	})
 	if Abort(c, err) {
@@ -50,24 +52,26 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 		return
 	}
 
+	tokUsr := s.TokenUser(c)
+
 	var order front.Order
-	err := s.LockOrderTx(claims.OrderID, func() (cashLocked, pointsLocked bool, err error) {
-		return s.DB.PayOrder(&order, s.TokenUser(c), &payload)
+	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		return tx.PayOrder(&order, tokUsr, &payload)
 	})
 	if Abort(c, err) {
 		return
 	}
 
-	s.DB.GetOrderItems(order)
-	c.JSON(http.StatusOK, order)
+	s.DB.GetOrderItems(&order)
+	c.JSON(http.StatusOK, &order)
 }
 
 func (s *Server) PostMgrOrderState(c *gin.Context) {
 	claims := s.AdminClaims(c)
 
 	var order front.Order
-	err := s.LockOrderTx(claims.OrderID, func() (cashLocked, pointsLocked bool, err error) {
-		return s.DB.MgrOrderState(&order, claims, s.WxClient)
+	err := s.LockOrderTx(claims.UserId, claims.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		return tx.MgrOrderState(&order, claims, s.WxClient)
 	})
 	if Abort(c, err) {
 		return
@@ -82,9 +86,11 @@ func (s *Server) PostOrderState(c *gin.Context) {
 		return
 	}
 
+	tokUsr := s.TokenUser(c)
+
 	var order front.Order
-	err := s.LockOrderTx(payload.ID, func() (cashLocked, pointsLocked bool, err error) {
-		return s.DB.OrderChangeState(&order, s.TokenUser(c), &payload, s.WxClient)
+	err := s.LockOrderTx(tokUsr.ID, payload.ID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		return tx.OrderChangeState(&order, tokUsr, &payload, s.WxClient)
 	})
 	if Abort(c, err) {
 		return
@@ -100,13 +106,15 @@ func (s *Server) GetPaidOrder(c *gin.Context) {
 		return
 	}
 
+	tokUsr := s.TokenUser(c)
+
 	var order *front.Order
-	err := s.LockOrderTx(id, func() (cashLocked, pointsLocked bool, err error) {
-		order, err = s.DB.GetBareOrder(s.TokenUser(c), uint(id))
+	err := s.LockOrderTx(tokUsr.ID, uint(id), func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		order, err = tx.GetBareOrder(tokUsr, uint(id))
 		if err != nil {
 			return
 		}
-		return s.WxClient.UpdateWxOrderSate(dbs, order)
+		return s.WxClient.UpdateWxOrderSate(tokUsr, tx, order)
 	})
 	if Abort(c, err) {
 		return
@@ -130,7 +138,7 @@ func (s *Server) GetOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func (s *Server) LockOrderTx(orderId uint, inTx func() (cashLocked, pointsLocked bool, err error)) (err error) {
+func (s *Server) LockOrderTx(userId, orderId uint, inTx func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error)) (err error) {
 	if !lok.OrderLok.Lock(orderId) {
 		err = cerr.OrderTmpLocked
 		return
@@ -139,16 +147,16 @@ func (s *Server) LockOrderTx(orderId uint, inTx func() (cashLocked, pointsLocked
 	var cashLocked, pointsLocked bool
 	defer func() {
 		if cashLocked {
-			lok.CashLok.Unlock(claims.UserId)
+			lok.CashLok.Unlock(userId)
 		}
 		if pointsLocked {
-			lok.PointsLok.Unlock(claims.UserId)
+			lok.PointsLok.Unlock(userId)
 		}
 		lok.OrderLok.Unlock(orderId)
 	}()
 
 	return s.DB.InTx(func(tx *dbsrv.DbService) (err error) {
-		cashLocked, pointsLocked, err = inTx()
+		cashLocked, pointsLocked, err = inTx(tx)
 		return
 	})
 }

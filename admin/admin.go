@@ -13,10 +13,11 @@ import (
 
 type Claims struct {
 	jwt.StandardClaims
+	AminId  uint `json:"aid"`
 	UserId  uint `json:"uid"`
 	OrderID uint `json:"oid"`
 
-	State front.TradeState `json:"state"`
+	State front.OrderState `json:"state"`
 
 	WxRefund     uint `json:"wx_refund,omitempty"`
 	CashRefund   uint `json:"cash_refund,omitempty"`
@@ -32,7 +33,7 @@ type Admin struct {
 }
 
 func NewAdmin(conf *config.Config) *Admin {
-	a := &Admin{conf: conf.Security}
+	a := &Admin{conf: &conf.Security}
 	defaults.SetDefaults(a)
 	return a
 }
