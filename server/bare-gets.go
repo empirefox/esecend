@@ -17,7 +17,20 @@ func (s *Server) GetProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, &front.ProfileResponse{
+		Profile: data.(*front.Profile),
+
+		WxAppId:     s.Config.Weixin.AppId,
+		WxLoginPath: s.Config.Security.WxOauthPath,
+		//	WxScope     s.Config.Weixin.AppId,
+
+		// Config.Order
+		EvalTimeoutDay:        s.Config.Order.EvalTimeoutDay,
+		CompleteTimeoutDay:    s.Config.Order.CompleteTimeoutDay,
+		CheckoutExpiresMinute: s.Config.Order.CheckoutExpiresMinute,
+		WxPayExpiresMinute:    s.Config.Order.WxPayExpiresMinute,
+		Point2Cent:            s.Config.Order.Point2Cent,
+	})
 }
 
 func (s *Server) GetTableAll(view reform.View) gin.HandlerFunc {
