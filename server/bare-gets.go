@@ -121,6 +121,12 @@ func (s *Server) GetWallet(c *gin.Context) {
 	})
 }
 
+func (s *Server) GetAddrs(c *gin.Context) {
+	tokUsr := s.TokenUser(c)
+	data, err := s.DB.GetDB().FindAllFrom(front.AddressTable, "$UserID", tokUsr.ID)
+	ResponseArray(c, data, err)
+}
+
 func (s *Server) GetOrders(c *gin.Context) {
 	tokUsr := s.TokenUser(c)
 	data, err := s.DB.GetDB().FindAllFrom(front.OrderTable, "$UserID", tokUsr.ID)

@@ -33,11 +33,6 @@ type Server struct {
 }
 
 func (s *Server) BuildEngine() error {
-	captcha, err := captchar.NewCaptchar()
-	if err != nil {
-		return err
-	}
-	s.Captcha = captcha
 
 	corsMiddleWare := s.Cors("GET, PUT, POST, DELETE")
 
@@ -67,8 +62,8 @@ func (s *Server) BuildEngine() error {
 	router.GET("/carousel", s.GetTableAll(front.CarouselItemTable))
 	router.GET("/evals/:product_id", s.GetEvals)
 	router.GET("/category", s.GetTableAll(front.CategoryTable))
-	router.GET("/product/ls")
-	router.GET("/product/bundle/:matrix")
+	router.GET("/product/ls", s.GetProducts)
+	router.GET("/product/bundle/:matrix", s.GetProductsBundle)
 	router.GET("/product/1/:id", s.GetProduct)
 	router.GET("/product/attrs", s.GetProductAttrs)
 	router.GET("/groupbuy", s.GetGroupBuy)
@@ -84,15 +79,15 @@ func (s *Server) BuildEngine() error {
 	router.GET("/orders", auth, mustAuthed, s.GetOrders)
 	router.POST("/checkout", auth, mustAuthed, s.PostCheckout)
 	router.POST("/order_pay", auth, mustAuthed, s.PostOrderPay)
-	router.POST("/order_wx_pay", auth, mustAuthed, s.PostOrderPrepay)
+	router.POST("/order_wx_pay", auth, mustAuthed, s.PostOrderWxPrepay)
 	router.GET("/order/:id", auth, mustAuthed, s.GetOrder)
-	router.POST("/order_state/:id", auth, mustAuthed) // TODO
+	router.POST("/order_state/:id", auth, mustAuthed, s.PostEval)
 	router.GET("/paied_order/:id", auth, mustAuthed, s.GetPaidOrder)
 	router.POST("/eval/:id", auth, mustAuthed, s.PostEval)
 	router.GET("/cart", auth, mustAuthed, s.GetCart)
 	router.POST("/cart", auth, mustAuthed, s.PostCartSave)
 	router.DELETE("/cart/:id", auth, mustAuthed, s.DeleteCartItem)
-	router.GET("/addrs", auth, mustAuthed, s.GetTableAll(front.AddressTable))
+	router.GET("/addrs", auth, mustAuthed, s.GetAddrs)
 	router.POST("/addr", auth, mustAuthed, s.PostAddr)
 	router.DELETE("/addr/:id", auth, mustAuthed, s.DeleteAddr)
 	router.GET("/delivery/:order_id", auth, mustAuthed, s.GetDelivery)

@@ -363,38 +363,43 @@ func (dbs *DbService) PrepayOrder(
 		}
 
 		if res["result_code"] == "SUCCESS" {
-			if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
-				err = cerr.CashTmpLocked
-				return
-			}
-
 			var flow front.CapitalFlow
-			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
-			if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-				return
-			}
-			if uint(-flow.Amount) != order.CashPaid {
-				err = cerr.InvalidCashPrepaid
-				return
-			}
+			if order.CashPaid != 0 {
+				if cashLocked = lok.CashLok.Lock(tokUsr.ID); !cashLocked {
+					err = cerr.CashTmpLocked
+					return
+				}
 
-			if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
-				err = cerr.PointsTmpLocked
-				return
+				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TCapitalFlowPrepay))
+				if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
+					return
+				}
+				if uint(-flow.Amount) != order.CashPaid {
+					err = cerr.InvalidCashPrepaid
+					return
+				}
+
 			}
 
 			var points front.PointsItem
-			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
-			if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
-				return
-			}
-			if uint(-points.Amount)*dbs.config.Order.Point2Cent != order.PointsPaid {
-				err = cerr.InvalidPointsPrepaid
-				return
-			}
+			if order.PointsPaid != 0 {
+				if pointsLocked = lok.PointsLok.Lock(tokUsr.ID); !pointsLocked {
+					err = cerr.PointsTmpLocked
+					return
+				}
 
-			if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
-				return
+				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TPointsPrepay))
+				if err = db.DsSelectOneTo(&points, ds); err != nil && err != reform.ErrNoRows {
+					return
+				}
+				if uint(-points.Amount)*dbs.config.Order.Point2Cent != order.PointsPaid {
+					err = cerr.InvalidPointsPrepaid
+					return
+				}
+
+				if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
+					return
+				}
 			}
 
 			attach := &models.UnifiedOrderAttach{

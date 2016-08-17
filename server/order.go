@@ -25,6 +25,33 @@ func (s *Server) PostCheckout(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
+func (s *Server) PostOrderWxPrepay(c *gin.Context) {
+	var payload front.OrderPrepayPayload
+	if err := c.BindJSON(&payload); Abort(c, err) {
+		return
+	}
+
+	if payload.Cash != 0 || payload.Points != 0 {
+		front.NewCodev(cerr.InvalidPostBody).Abort(c, http.StatusBadRequest)
+		return
+	}
+
+	payload.Ip = c.ClientIP()
+
+	tokUsr := s.TokenUser(c)
+
+	var args *front.WxPayArgs
+	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
+		args, cashLocked, pointsLocked, err = tx.PrepayOrder(tokUsr, &payload, s.WxClient)
+		return
+	})
+	if Abort(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, args)
+}
+
 func (s *Server) PostOrderPrepay(c *gin.Context) {
 	var payload front.OrderPrepayPayload
 	if err := c.BindJSON(&payload); Abort(c, err) {
