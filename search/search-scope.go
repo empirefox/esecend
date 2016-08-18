@@ -20,7 +20,7 @@ type SearchScope struct {
 // &sp(scope)=2016style+white
 func (c *Context) HandleQueryScopes() {
 	if c.Resource.scopeMap != nil {
-		for _, sp := range strings.Split(c.Query.Get("sp"), "+") {
+		for _, sp := range strings.Split(c.Query.Get("sp"), " ") {
 			if scope, ok := c.Resource.scopeMap[sp]; ok {
 				if scope.Handle != nil {
 					scope.Handle(c)

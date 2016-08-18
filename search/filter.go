@@ -22,7 +22,7 @@ type FilterHandler func(params []string, c *Context)
 // &ft(filter)=Price:gteq:10+Price:lteq:20+Discount:true
 func (c *Context) HandleQueryFilters() {
 	filters := c.Resource.GetFilters()
-	for _, ft := range strings.Split(c.Query.Get("ft"), "+") {
+	for _, ft := range strings.Split(c.Query.Get("ft"), " ") {
 		segs := strings.Split(ft, ":")
 		if len(segs) > 1 {
 			if filter, ok := filters[segs[0]]; ok {
