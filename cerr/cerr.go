@@ -11,6 +11,7 @@ func (ce CodedError) Error() string {
 // all are non-StatusForbidden
 const (
 	Error CodedError = iota
+	Unauthorized
 	SonyFlakeTimeout
 	InvalidUrlParam
 	InvalidPostBody

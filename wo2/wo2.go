@@ -1,6 +1,7 @@
 package wo2
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -10,12 +11,19 @@ import (
 	mpoauth2 "github.com/chanxuehong/wechat.v2/mp/oauth2"
 	"github.com/chanxuehong/wechat.v2/oauth2"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/config"
+	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/esecend/l"
 	"github.com/gin-gonic/gin"
 	"github.com/mcuadros/go-defaults"
 )
 
-var log = logrus.New()
+var (
+	log = logrus.New()
+
+	ErrEmptyCode = errors.New("auth code is empty")
+)
 
 type SecurityHandler interface {
 	Login(userinfo *mpoauth2.UserInfo) (ret interface{}, err error)
@@ -25,6 +33,9 @@ type SecurityHandler interface {
 type Auther struct {
 	GinJwtKey  string `default:"claims"`
 	GinUserKey string `default:"tokUser"`
+
+	Oauth2HttpClient      *http.Client
+	GetUserInfoHttpClient *http.Client
 
 	wx          *config.Weixin
 	wxOauthPath string
@@ -57,7 +68,7 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.URL.Path == a.wxOauthPath && c.Request.Method == "POST" {
 			if err := a.authHandle(c); err != nil {
-				c.AbortWithError(http.StatusUnauthorized, err)
+				front.NewCodeErrv(cerr.Unauthorized, err).Abort(c, http.StatusUnauthorized)
 			}
 		} else {
 			tok, user, err := a.secHandler.ParseToken(c)
@@ -72,7 +83,7 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 func (a *Auther) MustAuthed(c *gin.Context) {
 	tok, ok := c.Keys[a.GinJwtKey]
 	if !ok || !tok.(*jwt.Token).Valid {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		front.NewCodev(cerr.Unauthorized).Abort(c, http.StatusUnauthorized)
 	}
 }
 
@@ -87,19 +98,22 @@ func (a *Auther) loadDefault() {
 
 func (a *Auther) authHandle(c *gin.Context) error {
 	raw, _ := ioutil.ReadAll(c.Request.Body)
-	log.Debugf("Code Body:%s\n", raw)
+	log.WithFields(l.Locate(logrus.Fields{})).Debugf("Code Body:%s", raw)
 	code, err := jsonparser.GetUnsafeString(raw, "code")
 	if err != nil {
 		return err
 	}
+	if code == "" {
+		return ErrEmptyCode
+	}
 
-	client := &oauth2.Client{Endpoint: a.endpoint}
+	client := &oauth2.Client{Endpoint: a.endpoint, HttpClient: a.Oauth2HttpClient}
 	tok, err := client.ExchangeToken(code)
 	if err != nil {
 		return err
 	}
 
-	userinfo, err := mpoauth2.GetUserInfo(tok.AccessToken, tok.OpenId, "", nil)
+	userinfo, err := mpoauth2.GetUserInfo(tok.AccessToken, tok.OpenId, "", a.GetUserInfoHttpClient)
 	if err != nil {
 		return err
 	}
