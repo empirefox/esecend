@@ -71,10 +71,10 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 				front.NewCodeErrv(cerr.Unauthorized, err).Abort(c, http.StatusUnauthorized)
 			}
 		} else {
-			tok, user, err := a.secHandler.ParseToken(c)
+			tok, tokUsr, err := a.secHandler.ParseToken(c)
 			if err == nil {
 				c.Set(a.GinJwtKey, tok)
-				c.Set(a.GinUserKey, user)
+				c.Set(a.GinUserKey, tokUsr)
 			}
 		}
 	}
