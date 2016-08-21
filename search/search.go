@@ -13,7 +13,7 @@ import (
 //		/:table/ls?typ=n/m
 //		&q(query)=bmw
 //		&st(start)=100&sz(size)=20&tl=1
-//		&sp(scope)=2016style+white
+//		&sp(scope)=2016style
 //		&ft(filter)=Price:gteq:10+Price:lteq:20+Discount:true
 //		&ob(order)=Price:desc
 func (c *Context) FindMany() ([]reform.Struct, error) {
@@ -32,7 +32,7 @@ func (c *Context) FindMany() ([]reform.Struct, error) {
 //		/:table/ls?typ=n/m
 //		&q(query)=bmw
 //		&st(start)=100&sz(size)=20&tl=1
-//		&sp(scope)=2016style+white
+//		&sp(scope)=2016style
 //		&ft(filter)=Price:gteq:10+Price:lteq:20+Discount:true
 //		&ob(order)=Price:desc
 func (c *Context) HandleSearch() (hasOrder bool) {

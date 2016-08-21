@@ -30,6 +30,16 @@ func ResponseArray(c *gin.Context, data interface{}, err error) {
 	}
 }
 
+func ResponseObject(c *gin.Context, data interface{}, err error) {
+	if err == nil {
+		c.JSON(http.StatusOK, data)
+	} else if err == reform.ErrNoRows {
+		c.JSON(http.StatusOK, &EmptyObjectJson)
+	} else {
+		Abort(c, err)
+	}
+}
+
 func Abort(c *gin.Context, err error) bool {
 	if err != nil {
 		switch e := err.(type) {

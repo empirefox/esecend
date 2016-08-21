@@ -62,6 +62,7 @@ func (s *Server) BuildEngine() error {
 	router.GET("/carousel", s.GetTableAll(front.CarouselItemTable))
 	router.GET("/evals/:product_id", s.GetEvals)
 	router.GET("/category", s.GetTableAll(front.CategoryTable))
+	router.GET("/product/special/:id", s.GetSpecialProducts)
 	router.GET("/product/ls", s.GetProducts)
 	router.GET("/product/bundle/:matrix", s.GetProductsBundle)
 	router.GET("/product/1/:id", s.GetProduct)

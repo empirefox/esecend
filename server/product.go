@@ -32,12 +32,12 @@ func (s *Server) GetProductsBundle(c *gin.Context) {
 
 	// no products
 	if err != nil && len(products) == 0 {
-		ResponseArray(c, nil, err)
+		ResponseObject(c, nil, err)
 		return
 	}
 
 	data, err := s.DB.ProductsFillResponse(products...)
-	ResponseArray(c, &front.ProductsBundleResponse{
+	ResponseObject(c, &front.ProductsBundleResponse{
 		Bundle: bundle,
 		Skus:   data.Skus,
 		Attrs:  data.Attrs,
@@ -59,7 +59,19 @@ func (s *Server) GetProducts(c *gin.Context) {
 		data, err = s.DB.ProductsFillResponse(products...)
 	}
 
-	ResponseArray(c, data, err)
+	ResponseObject(c, data, err)
+}
+
+func (s *Server) GetSpecialProducts(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if id == 0 {
+		front.NewCodev(cerr.InvalidUrlParam).Abort(c, http.StatusBadRequest)
+		return
+	}
+
+	data, err := s.DB.GetSpecialProducts(uint(id))
+
+	ResponseObject(c, data, err)
 }
 
 func (s *Server) GetProduct(c *gin.Context) {
@@ -76,5 +88,5 @@ func (s *Server) GetProduct(c *gin.Context) {
 		data, err = s.DB.ProductsFillResponse(product)
 	}
 
-	ResponseArray(c, data, err)
+	ResponseObject(c, data, err)
 }

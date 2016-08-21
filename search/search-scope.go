@@ -1,10 +1,6 @@
 package search
 
-import (
-	"strings"
-
-	"github.com/Sirupsen/logrus"
-)
+import "github.com/Sirupsen/logrus"
 
 type SearchScopeGroup struct {
 	Name   string
@@ -17,14 +13,12 @@ type SearchScope struct {
 }
 
 // HandleQueryScopes handle scopes from query string:
-// &sp(scope)=2016style+white
+// &sp(scope)=2016style
 func (c *Context) HandleQueryScopes() {
 	if c.Resource.scopeMap != nil {
-		for _, sp := range strings.Split(c.Query.Get("sp"), " ") {
-			if scope, ok := c.Resource.scopeMap[sp]; ok {
-				if scope.Handle != nil {
-					scope.Handle(c)
-				}
+		if scope, ok := c.Resource.scopeMap[c.Query.Get("sp")]; ok {
+			if scope.Handle != nil {
+				scope.Handle(c)
 			}
 		}
 	}
