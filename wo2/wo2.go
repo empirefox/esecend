@@ -27,7 +27,7 @@ var (
 
 type SecurityHandler interface {
 	Login(userinfo *mpoauth2.UserInfo) (ret interface{}, err error)
-	ParseToken(c *gin.Context) (tok *jwt.Token, tokUsr interface{}, err error)
+	ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interface{}, err error)
 }
 
 type Auther struct {
@@ -59,10 +59,13 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 	}
 	a.loadDefault()
 
-	if len(iuser) > 0 {
+	if len(iuser) == 2 {
 		return func(c *gin.Context) {
-			c.Set(a.GinUserKey, iuser[0])
+			c.Set(a.GinJwtKey, iuser[0])
+			c.Set(a.GinUserKey, iuser[1])
 		}
+	} else if len(iuser) != 0 {
+		panic("iuser must be 2 len if set")
 	}
 
 	return func(c *gin.Context) {
@@ -71,7 +74,7 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 				front.NewCodeErrv(cerr.Unauthorized, err).Abort(c, http.StatusUnauthorized)
 			}
 		} else {
-			tok, tokUsr, err := a.secHandler.ParseToken(c)
+			tok, tokUsr, err := a.secHandler.ParseToken(c.Request)
 			if err == nil {
 				c.Set(a.GinJwtKey, tok)
 				c.Set(a.GinUserKey, tokUsr)

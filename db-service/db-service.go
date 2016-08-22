@@ -32,7 +32,7 @@ type DbService struct {
 func NewDbService(config *config.Config, isDebug bool) (*DbService, error) {
 	conf := &config.Mysql
 
-	db_, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8",
+	db_, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8",
 		conf.UserName, conf.Password, conf.Host, conf.Port, conf.Database))
 	if err != nil {
 		return nil, err

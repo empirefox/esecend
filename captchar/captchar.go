@@ -24,10 +24,10 @@ type Captchar struct {
 	capCache *cache.Cache
 }
 
-func NewCaptchar() (*Captchar, error) {
+func NewCaptchar(font string) (*Captchar, error) {
 	cap := captcha.New()
 
-	if err := cap.SetFont("comic.ttf"); err != nil {
+	if err := cap.SetFont(font); err != nil {
 		return nil, err
 	}
 

@@ -1,56 +1,102 @@
 package server
 
 import (
-	"github.com/gin-gonic/contrib/secure"
-	"github.com/gin-gonic/gin"
+	"os"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/captchar"
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/esecend/search"
 	"github.com/empirefox/esecend/sec"
 	"github.com/empirefox/esecend/sms"
 	"github.com/empirefox/esecend/wo2"
 	"github.com/empirefox/esecend/wx"
-	"github.com/empirefox/gotool/paas"
+	"github.com/gin-gonic/gin"
 )
 
-type Server struct {
-	*gin.Engine
-	IsDevMode  bool
-	Config     *config.Config
-	Auther     *wo2.Auther
-	SecHandler *security.Handler
-	Admin      *admin.Admin
-	WxClient   *wx.WxClient
-	SmsSender  *sms.Sender
-	DB         *dbsrv.DbService
-	Captcha    *captchar.Captchar
+var (
+	isDevMode = true
+	log       = logrus.New()
 
-	ProductResource *search.Resource
+	server *Server
+)
+
+func init() {
+	server = newServer()
 }
 
-func (s *Server) BuildEngine() error {
+func newServer() *Server {
+	configFile := os.Getenv("CONFIG")
+	if configFile == "" {
+		panic("SQL_BASE must be set")
+	}
 
-	corsMiddleWare := s.Cors("GET, PUT, POST, DELETE")
+	var err error
+	conf, err := config.Load(configFile)
+	if err != nil {
+		panic(err)
+	}
 
-	auth := s.Auther.Middleware()
+	dbs, err := dbsrv.NewDbService(conf, isDevMode)
+	if err != nil {
+		panic(err)
+	}
+
+	wxClient, err := wx.NewWxClient(conf, dbs)
+	if err != nil {
+		panic(err)
+	}
+
+	captcha, err := captchar.NewCaptchar("../comic.ttf")
+	if err != nil {
+		panic(err)
+	}
+
+	productResource := &search.Resource{
+		Conf: conf,
+		Dbs:  dbs,
+		View: front.ProductTable,
+	}
+	productResource.SetDefaultFilters()
+	productResource.SearchAttrs("Name", "Intro", "Detail")
+
+	secHandler := security.NewHandler(conf, dbs)
+
+	s := &Server{
+		IsDevMode:  isDevMode,
+		Config:     conf,
+		Auther:     wo2.NewAuther(conf, secHandler),
+		SecHandler: secHandler,
+		Admin:      admin.NewAdmin(conf),
+		WxClient:   wxClient,
+		SmsSender:  sms.NewSender(conf, isDevMode),
+		DB:         dbs,
+		Captcha:    captcha,
+
+		ProductResource: productResource,
+	}
+
+	auth := s.Auther.Middleware(
+		&jwt.Token{
+			Claims: &front.TokenClaims{
+				OpenId: "open_id",
+				UserId: 100,
+			},
+			Valid: true,
+		},
+		&models.User{
+			ID:     100,
+			OpenId: "open_id",
+		},
+	)
 	mustAuthed := s.Auther.MustAuthed
 
 	router := gin.Default()
-
-	router.Use(secure.Secure(secure.Options{
-		SSLRedirect: true,
-		SSLProxyHeaders: map[string]string{
-			"X-Forwarded-Proto": "https",
-		},
-		IsDevelopment: s.IsDevMode,
-	}))
-	router.Use(corsMiddleWare)
-
-	// for admin
 	a := router.Group("/admin", s.MustAdmin)
 	a.POST("/order_state", s.PostMgrOrderState)
 
@@ -94,22 +140,6 @@ func (s *Server) BuildEngine() error {
 	router.GET("/delivery/:order_id", auth, mustAuthed, s.GetDelivery)
 	router.DELETE("/logout", auth, s.DeleteLogout)
 
-	optPaths := make(map[string]bool)
-	rs := s.Routes()
-	for _, r := range rs {
-		if r.Method == "OPTIONS" {
-			optPaths[r.Path] = true
-		}
-	}
-	for _, r := range rs {
-		if !optPaths[r.Path] {
-			s.OPTIONS(r.Path, s.Ok)
-		}
-	}
 	s.Engine = router
-	return nil
-}
-
-func (s *Server) StartRun() {
-	s.Run(paas.BindAddr)
+	return s
 }

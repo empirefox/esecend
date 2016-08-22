@@ -3,6 +3,7 @@ package config
 import (
 	"io/ioutil"
 
+	"github.com/mcuadros/go-defaults"
 	"github.com/rolldever/go-json5"
 )
 
@@ -16,5 +17,6 @@ func Load(jsonPath string) (*Config, error) {
 	if err = json5.Unmarshal(bDoc, &config); err != nil {
 		return nil, err
 	}
+	defaults.SetDefaults(&config)
 	return &config, nil
 }
