@@ -11,8 +11,7 @@ import (
 
 func (s *Server) PostAddr(c *gin.Context) {
 	var data front.Address
-	if err := c.BindJSON(&data); err != nil {
-		front.NewCodeErrv(cerr.InvalidPostBody, err).Abort(c, http.StatusBadRequest)
+	if err := c.BindJSON(&data); Abort(c, err) {
 		return
 	}
 

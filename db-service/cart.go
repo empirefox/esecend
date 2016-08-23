@@ -65,6 +65,6 @@ func (dbs *DbService) CartItemSave(userId uint, payload *front.SaveToCartPayload
 
 func (dbs *DbService) CartItemDel(userId, id uint) error {
 	ds := dbs.DS.Where(goqu.I("$UserID").Eq(userId), goqu.I("$SkuID").Eq(id))
-	_, err := dbs.GetDB().DsDelete(front.AddressTable, ds)
+	_, err := dbs.GetDB().DsDelete(front.CartItemTable, ds)
 	return err
 }
