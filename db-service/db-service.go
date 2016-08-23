@@ -49,7 +49,7 @@ func NewDbService(config *config.Config, isDebug bool) (*DbService, error) {
 	return &DbService{
 		config:  config,
 		db:      reform.NewDB(db_, mysql.Dialect, reformLogger),
-		DS:      ds.SetAdapter(goqu.NewDefaultAdapter(ds)).Prepared(!isDebug),
+		DS:      ds.SetAdapter(goqu.NewAdapter("mysql", ds)).Prepared(!isDebug),
 		isDebug: isDebug,
 	}, nil
 }
