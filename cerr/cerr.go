@@ -18,6 +18,7 @@ const (
 	InvalidPhoneFormat
 	RebindSamePhone
 	PhoneOccupied
+	PhoneBindRequired
 	UserNotFound
 	DbFailed
 	CaptchaRejected
@@ -36,6 +37,10 @@ const (
 	InvalidClaimId
 	InvalidUserID
 	Forbidden
+	RetrySmsFailed
+	SendSmsError
+	SendSmsFailed
+	SmsVerifyFailed
 
 	InvalidProductId
 	InvalidSkuStock

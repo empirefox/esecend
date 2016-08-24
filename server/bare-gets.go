@@ -30,6 +30,7 @@ func (s *Server) GetProfile(c *gin.Context) {
 		CheckoutExpiresMinute: s.Config.Order.CheckoutExpiresMinute,
 		WxPayExpiresMinute:    s.Config.Order.WxPayExpiresMinute,
 		Point2Cent:            s.Config.Order.Point2Cent,
+		FreeDeliverLine:       s.Config.Order.FreeDeliverLine,
 	})
 }
 

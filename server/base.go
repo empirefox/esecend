@@ -50,7 +50,7 @@ func Abort(c *gin.Context, err error) bool {
 			front.NewGinv(err).Abort(c, http.StatusBadRequest)
 			return true
 		}
-		c.AbortWithError(http.StatusInternalServerError, err)
+		front.NewCodeErrv(cerr.Error, err).Abort(c, http.StatusInternalServerError)
 		return true
 	}
 	return false
@@ -66,7 +66,7 @@ func AbortWithoutNoRecord(c *gin.Context, err error) bool {
 			front.NewGinv(err).Abort(c, http.StatusBadRequest)
 			return true
 		}
-		c.AbortWithError(http.StatusInternalServerError, err)
+		front.NewCodeErrv(cerr.Error, err).Abort(c, http.StatusInternalServerError)
 		return true
 	}
 	return false

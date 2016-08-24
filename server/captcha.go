@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) PostCaptcha(c *gin.Context) {
-	data, err := s.Captcha.New()
+	data, err := s.Captcha.New(s.TokenUser(c).ID)
 	if err != nil {
 		front.NewCodeErrv(cerr.GenCaptchaFailed, err).Abort(c, http.StatusInternalServerError)
 		return

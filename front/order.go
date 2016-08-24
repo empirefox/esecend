@@ -117,10 +117,12 @@ type Order struct {
 }
 
 type CheckoutPayloadItem struct {
-	SkuID      uint
-	Quantity   uint
-	GroupBuyID uint
-	Attrs      []uint // attr ids sorted
+	SkuID         uint
+	Quantity      uint
+	SkuPrice      uint // TODO
+	GroupBuyID    uint
+	GroupBuyPrice uint   // TODO
+	Attrs         []uint // attr ids sorted
 
 	// ids queried from db
 	AttrIds []uint `json:"-"`

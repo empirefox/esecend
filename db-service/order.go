@@ -37,6 +37,7 @@ func (dbs *DbService) GetOrderItems(o *front.Order) ([]*front.OrderItem, error) 
 	return o.Items, nil
 }
 
+// TODO change to single thread
 func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (*front.Order, error) {
 	// prepare skuIds, groupbuyIds to query
 	var skuIds []interface{}
@@ -134,11 +135,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	}
 
 	// check order money
-	profile, err := db.SelectOneFrom(front.ProfileView, "LIMIT 1")
-	if err != nil {
-		return nil, err
-	}
-	if total >= profile.(*front.Profile).FreeDeliverLine {
+	if total >= dbs.config.Order.FreeDeliverLine {
 		freight = 0
 	}
 	total += freight

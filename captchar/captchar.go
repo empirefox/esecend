@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image/color"
 	"image/png"
 	"time"
@@ -19,12 +20,17 @@ var (
 	clears  = 10 * time.Minute
 )
 
-type Captchar struct {
+type Captchar interface {
+	New(userId uint) (*front.Captcha, error)
+	Verify(userId uint, key, value string) bool
+}
+
+type captchar struct {
 	cap      *captcha.Captcha
 	capCache *cache.Cache
 }
 
-func NewCaptchar(font string) (*Captchar, error) {
+func NewCaptchar(font string) (Captchar, error) {
 	cap := captcha.New()
 
 	if err := cap.SetFont(font); err != nil {
@@ -45,13 +51,13 @@ func NewCaptchar(font string) (*Captchar, error) {
 		color.RGBA{0, 178, 113, 255},
 	)
 
-	return &Captchar{
+	return &captchar{
 		cap:      cap,
 		capCache: cache.New(expires, clears),
 	}, nil
 }
 
-func (c *Captchar) New() (*front.Captcha, error) {
+func (c *captchar) New(userId uint) (*front.Captcha, error) {
 	img, value := c.cap.Create(6, captcha.ALL)
 
 	var b bytes.Buffer
@@ -64,7 +70,7 @@ func (c *Captchar) New() (*front.Captcha, error) {
 	b.WriteByte('"')
 
 	key := uniuri.New()
-	for c.capCache.Add(key, value, cache.DefaultExpiration) != nil {
+	for c.capCache.Add(key, fmt.Sprintln("%d:%s", userId, value), cache.DefaultExpiration) != nil {
 		key = uniuri.NewLen(20)
 	}
 
@@ -75,7 +81,10 @@ func (c *Captchar) New() (*front.Captcha, error) {
 	}, nil
 }
 
-func (c *Captchar) Validate(key, value string) bool {
+func (c *captchar) Verify(userId uint, key, value string) bool {
 	fact, ok := c.capCache.Get(key)
-	return ok && fact.(string) == value
+	if ok {
+		c.capCache.Delete(key)
+	}
+	return ok && fact.(string) == fmt.Sprintln("%d:%s", userId, value)
 }

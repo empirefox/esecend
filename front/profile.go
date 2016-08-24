@@ -6,7 +6,6 @@ import "time"
 //reform:cc_profile
 type Profile struct {
 	Phone            string `reform:"phone"`
-	FreeDeliverLine  uint   `reform:"free_delivery_line"`
 	DefaultHeadImage string `reform:"default_head_image"`
 }
 
@@ -22,4 +21,5 @@ type ProfileResponse struct {
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	Point2Cent            uint
+	FreeDeliverLine       uint
 }

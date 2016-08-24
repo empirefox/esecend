@@ -2,35 +2,45 @@ package sms
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/dchest/uniuri"
+	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/config"
-	"github.com/empirefox/esecend/utils"
-	"github.com/gin-gonic/gin"
 	"github.com/opensource-conet/alidayu"
 	"github.com/patrickmn/go-cache"
 )
 
-type LimitedCode struct {
-	Code  string
-	GenAt int64
+const (
+	BindPhone = "B"
+	SetPaykey = "P"
+)
+
+type Sender interface {
+	Send(prefix string, userId uint, phone string) error
+	Verify(prefix string, userId uint, phone, code string) bool
 }
 
-type Sender struct {
+type LimitedCode struct {
+	ID     string
+	Code   string
+	UserID uint
+	GenAt  int64
+}
+
+type sender struct {
 	config    *config.Alidayu
 	cache     *cache.Cache
 	retryMin  time.Duration
 	codeChars []byte
 }
 
-func NewSender(config *config.Config, isDebug bool) *Sender {
+func NewSender(config *config.Config, isDebug bool) Sender {
 	dayu := &config.Alidayu
 	alidayu.Appkey = dayu.Appkey
 	alidayu.AppSecret = dayu.AppSecret
 	alidayu.IsDebug = isDebug
-	return &Sender{
+	return &sender{
 		config:    dayu,
 		cache:     cache.New(dayu.ExpiresMinute*time.Minute, dayu.ClearsMinute*time.Minute),
 		retryMin:  dayu.RetryMinSecond * time.Second,
@@ -38,38 +48,44 @@ func NewSender(config *config.Config, isDebug bool) *Sender {
 	}
 }
 
-// TODO split to server, because we may check if phone is binded already
-func (s *Sender) Send(c *gin.Context) {
-	phone := c.Param("phone")
-	if !utils.RegPhone.MatchString(phone) {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (s *sender) Verify(prefix string, userId uint, phone, code string) bool {
+	key := prefix + phone
 
-	if limitedCode, ok := s.cache.Get(phone); ok {
-		if time.Now().Add(-s.retryMin).Unix() < limitedCode.(*LimitedCode).GenAt {
-			c.AbortWithStatus(http.StatusServiceUnavailable)
-			return
+	limitedCode, ok := s.cache.Get(key)
+	if !ok {
+		return false
+	}
+	s.cache.Delete(key)
+
+	lcode := limitedCode.(*LimitedCode)
+	return lcode.UserID == userId && lcode.Code == code
+}
+
+func (s *sender) Send(prefix string, userId uint, phone string) error {
+	key := prefix + phone
+
+	if limitedCode, ok := s.cache.Get(key); ok {
+		lcode := limitedCode.(*LimitedCode)
+		if time.Now().Add(-s.retryMin).Unix() < lcode.GenAt || lcode.UserID != userId {
+			return cerr.RetrySmsFailed
 		}
 	}
 
 	lcode := LimitedCode{
-		Code:  uniuri.NewLenChars(s.config.CodeLen, s.codeChars),
-		GenAt: time.Now().Unix(),
+		Code:   uniuri.NewLenChars(s.config.CodeLen, s.codeChars),
+		UserID: userId,
+		GenAt:  time.Now().Unix(),
 	}
-	s.cache.Set(phone, &lcode, cache.DefaultExpiration)
+	s.cache.Set(key, &lcode, cache.DefaultExpiration)
 
 	res, err := alidayu.SendOnce(phone, s.config.SignName, s.config.Template, fmt.Sprintf(`{"code":"%s"}`, lcode.Code))
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		return cerr.SendSmsError
 	}
 
 	if !res.Success {
-		c.JSON(http.StatusBadGateway, res.ResultError)
-		c.Abort()
-		return
+		return cerr.SendSmsFailed
 	}
 
-	c.AbortWithStatus(http.StatusOK)
+	return nil
 }

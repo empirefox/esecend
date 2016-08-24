@@ -24,6 +24,7 @@ type Order struct {
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	Point2Cent            uint
+	FreeDeliverLine       uint
 }
 
 type Weixin struct {

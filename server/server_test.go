@@ -85,12 +85,12 @@ func newServer() *Server {
 		&jwt.Token{
 			Claims: &front.TokenClaims{
 				OpenId: "open_id",
-				UserId: 100,
+				UserId: 1,
 			},
 			Valid: true,
 		},
 		&models.User{
-			ID:     100,
+			ID:     1,
 			OpenId: "open_id",
 		},
 	)
@@ -117,8 +117,10 @@ func newServer() *Server {
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
-	router.GET("/phone/prebind/:phone", auth, mustAuthed, s.SmsSender.Send)
+	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)
 	router.POST("/phone/bind", auth, mustAuthed, s.PostBindPhone)
+	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)
+	router.POST("/paykey/set", auth, mustAuthed, s.PostSetPaykey)
 	router.GET("/wishlist", auth, mustAuthed, s.GetWishlist)
 	router.POST("/wishlist_add", auth, mustAuthed, s.PostWishlistAdd)
 	router.DELETE("/wishlist/:id", auth, mustAuthed, s.DeleteWishItem)

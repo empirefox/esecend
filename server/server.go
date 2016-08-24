@@ -25,9 +25,9 @@ type Server struct {
 	SecHandler *security.Handler
 	Admin      *admin.Admin
 	WxClient   *wx.WxClient
-	SmsSender  *sms.Sender
+	SmsSender  sms.Sender
 	DB         *dbsrv.DbService
-	Captcha    *captchar.Captchar
+	Captcha    captchar.Captchar
 
 	ProductResource *search.Resource
 }
@@ -71,8 +71,10 @@ func (s *Server) BuildEngine() error {
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
-	router.GET("/phone/prebind/:phone", auth, mustAuthed, s.SmsSender.Send)
+	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)
 	router.POST("/phone/bind", auth, mustAuthed, s.PostBindPhone)
+	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)
+	router.POST("/paykey/set", auth, mustAuthed, s.PostSetPaykey)
 	router.GET("/wishlist", auth, mustAuthed, s.GetWishlist)
 	router.POST("/wishlist_add", auth, mustAuthed, s.PostWishlistAdd)
 	router.DELETE("/wishlist/:id", auth, mustAuthed, s.DeleteWishItem)

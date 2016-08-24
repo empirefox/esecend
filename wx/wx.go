@@ -241,7 +241,7 @@ func (wc *WxClient) updateWxOrderSate(
 			State:         front.TOrderStatePaid,
 			PaidAt:        timeEnd.Unix(),
 		}
-		err = dbs.GetDB().UpdateColumns(&data, "TransactionId", "TradeState", "State", "PaidAt")
+		err = dbs.GetDB().UpdateColumns(&data, "WxPaid", "TransactionId", "TradeState", "State", "PaidAt")
 		if err != nil {
 			return
 		}

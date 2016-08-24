@@ -35,7 +35,11 @@ type TokenClaims struct {
 	Nonce     string `json:"non,omitempty"`
 }
 
-type BindPhoneData struct {
+type PreBindPhonePayload struct {
+	Phone string
+}
+
+type BindPhonePayload struct {
 	Phone        string `binding:"required"`
 	Code         string `binding:"required"`
 	CaptchaID    string `binding:"required"`
@@ -50,4 +54,9 @@ type BindPhoneResponse struct {
 type RefreshTokenResponse struct {
 	OK          bool
 	AccessToken *string
+}
+
+type SetPaykeyPayload struct {
+	Key  string
+	Code string
 }

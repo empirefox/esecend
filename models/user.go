@@ -9,7 +9,10 @@ import (
 	"github.com/empirefox/esecend/front"
 )
 
-var ComparePaykey = bcrypt.CompareHashAndPassword
+var (
+	ComparePaykey = bcrypt.CompareHashAndPassword
+	EncPaykey     = bcrypt.GenerateFromPassword
+)
 
 //reform:cc_member
 type User struct {
