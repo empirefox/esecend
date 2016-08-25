@@ -38,13 +38,16 @@ func (dbs *DbService) ProductsFillResponse(products ...reform.Struct) (*front.Pr
 		return nil, err
 	}
 
-	ids = nil
-	for _, sku := range skus {
-		ids = append(ids, sku.(*front.Sku).ID)
-	}
-	attrIds, err := dbs.GetDB().FindAllFrom(front.ProductAttrIdTable, "$SkuID", ids...)
-	if err != nil {
-		return nil, err
+	var attrIds []reform.Struct
+	if len(skus) != 0 {
+		ids = nil
+		for _, sku := range skus {
+			ids = append(ids, sku.(*front.Sku).ID)
+		}
+		attrIds, err = dbs.GetDB().FindAllFrom(front.ProductAttrIdTable, "$SkuID", ids...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &front.ProductsResponse{

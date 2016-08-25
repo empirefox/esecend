@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (s *Server) PostCaptcha(c *gin.Context) {
+func (s *Server) GetCaptcha(c *gin.Context) {
 	data, err := s.Captcha.New(s.TokenUser(c).ID)
 	if err != nil {
 		front.NewCodeErrv(cerr.GenCaptchaFailed, err).Abort(c, http.StatusInternalServerError)

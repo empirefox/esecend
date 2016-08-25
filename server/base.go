@@ -15,6 +15,7 @@ import (
 var (
 	EmptyArrayJson  = json.RawMessage("[]")
 	EmptyObjectJson = json.RawMessage("{}")
+	NullJson        = json.RawMessage("null")
 )
 
 func (s *Server) Ok(c *gin.Context)       { c.AbortWithStatus(http.StatusOK) }
@@ -38,6 +39,17 @@ func ResponseObject(c *gin.Context, data interface{}, err error) {
 	} else {
 		Abort(c, err)
 	}
+}
+
+func AbortEmptyStructsWithNull(c *gin.Context, data []reform.Struct, err error) bool {
+	if Abort(c, err) {
+		return true
+	}
+	if data == nil {
+		c.JSON(http.StatusOK, &NullJson)
+		return true
+	}
+	return false
 }
 
 func Abort(c *gin.Context, err error) bool {

@@ -50,15 +50,10 @@ func (s *Server) BuildEngine() error {
 	}))
 	router.Use(corsMiddleWare)
 
-	// for admin
-	a := router.Group("/admin", s.MustAdmin)
-	a.GET("/order_state", s.GetMgrOrderState)
-
 	router.POST(s.Config.Security.WxOauthPath, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
 
 	router.GET("/profile", s.GetProfile)
-	router.GET("/captcha", s.PostCaptcha)
 	router.GET("/carousel", s.GetTableAll(front.CarouselItemTable))
 	router.GET("/evals/:product_id", s.GetEvals)
 	router.GET("/category", s.GetTableAll(front.CategoryTable))
@@ -71,6 +66,7 @@ func (s *Server) BuildEngine() error {
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
+	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
 	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)
 	router.POST("/phone/bind", auth, mustAuthed, s.PostBindPhone)
 	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)
@@ -96,22 +92,29 @@ func (s *Server) BuildEngine() error {
 	router.GET("/delivery/:order_id", auth, mustAuthed, s.GetDelivery)
 	router.DELETE("/logout", auth, s.DeleteLogout)
 
-	optPaths := make(map[string]bool)
-	rs := s.Routes()
+	optPathIgnore := make(map[string]bool)
+	optPathIgnore[s.Config.Security.PayNotifyPath] = true
+	rs := router.Routes()
 	for _, r := range rs {
 		if r.Method == "OPTIONS" {
-			optPaths[r.Path] = true
+			optPathIgnore[r.Path] = true
 		}
 	}
 	for _, r := range rs {
-		if !optPaths[r.Path] {
-			s.OPTIONS(r.Path, s.Ok)
+		if !optPathIgnore[r.Path] {
+			optPathIgnore[r.Path] = true
+			router.OPTIONS(r.Path, s.Ok)
 		}
 	}
+
+	// for admin
+	a := router.Group("/admin", s.MustAdmin)
+	a.GET("/order_state", s.GetMgrOrderState)
+
 	s.Engine = router
 	return nil
 }
 
-func (s *Server) StartRun() {
-	s.Run(paas.BindAddr)
+func (s *Server) StartRun() error {
+	return s.Run(paas.BindAddr)
 }

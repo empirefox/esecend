@@ -52,6 +52,10 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		}
 		skuidToPayloadItem[skuid] = &payload.Items[i]
 	}
+	if len(skuIds) == 0 {
+		return nil, cerr.InvalidSkuId
+	}
+
 	tx, err := dbs.Tx()
 	if err != nil {
 		return nil, err
@@ -120,6 +124,9 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		})
 	}
 
+	if len(productIdMap) == 0 {
+		return nil, cerr.InvalidProductId
+	}
 	// query products
 	var productIds []interface{}
 	for pid := range productIdMap {
@@ -157,6 +164,9 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	if err != nil {
 		return nil, err
 	}
+	if len(skuToAttrs) == 0 {
+		return nil, cerr.InvalidSkuId
+	}
 	// Attrs: prepare attr ids
 	attrIdMap := make(map[uint]bool)
 	for _, skuToAttri := range skuToAttrs {
@@ -177,7 +187,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	if err != nil {
 		return nil, err
 	}
-	if len(attrs) != len(attrIds) {
+	if len(attrs) == 0 || len(attrs) != len(attrIds) {
 		return nil, cerr.InvalidAttrId
 	}
 	attrMap := make(map[uint]*front.ProductAttr)

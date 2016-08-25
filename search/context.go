@@ -27,8 +27,9 @@ type Context struct {
 
 func (res *Resource) NewSearcher(context *gin.Context) *Context {
 	c := &Context{
-		DS:    res.Dbs.DS,
-		Query: context.Request.URL.Query(),
+		Resource: res,
+		DS:       res.Dbs.DS,
+		Query:    context.Request.URL.Query(),
 	}
 	return c
 }
@@ -36,8 +37,9 @@ func (res *Resource) NewSearcher(context *gin.Context) *Context {
 func (res *Resource) NewSearcherFromRaw(rawQuery string) *Context {
 	query, _ := url.ParseQuery(rawQuery)
 	c := &Context{
-		DS:    res.Dbs.DS,
-		Query: query,
+		Resource: res,
+		DS:       res.Dbs.DS,
+		Query:    query,
 	}
 	return c
 }

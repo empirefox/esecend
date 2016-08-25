@@ -48,7 +48,7 @@ func (s *Server) GetEvals(c *gin.Context) {
 		return
 	}
 
-	data, err := s.DB.GetDB().FindAllFrom(front.EvalItemView, "$ProductID", productId)
+	data, err := s.DB.GetDB().FindAllFrom(front.EvalItemView, front.OrderItemTable.ToCol("ProductID"), productId)
 	if Abort(c, err) {
 		return
 	}
@@ -76,7 +76,7 @@ func (s *Server) GetProductAttrs(c *gin.Context) {
 func (s *Server) GetGroupBuy(c *gin.Context) {
 	db := s.DB.GetDB()
 	items, err := db.SelectAllFrom(front.GroupBuyItemTable, "")
-	if Abort(c, err) {
+	if AbortEmptyStructsWithNull(c, items, err) {
 		return
 	}
 
@@ -98,7 +98,7 @@ func (s *Server) GetGroupBuy(c *gin.Context) {
 func (s *Server) GetWishlist(c *gin.Context) {
 	db := s.DB.GetDB()
 	items, err := db.SelectAllFrom(front.WishItemTable, "")
-	if Abort(c, err) {
+	if AbortEmptyStructsWithNull(c, items, err) {
 		return
 	}
 
@@ -151,11 +151,7 @@ func (s *Server) GetCart(c *gin.Context) {
 	db := s.DB.GetDB()
 	tokUsr := s.TokenUser(c)
 	items, err := db.FindAllFrom(front.CartItemTable, "$UserID", tokUsr.ID)
-	if err == reform.ErrNoRows {
-		c.JSON(http.StatusOK, &EmptyArrayJson)
-		return
-	}
-	if Abort(c, err) {
+	if AbortEmptyStructsWithNull(c, items, err) {
 		return
 	}
 
@@ -168,13 +164,16 @@ func (s *Server) GetCart(c *gin.Context) {
 		return
 	}
 
-	args = nil
-	for _, item := range skus {
-		args = append(args, item.(*front.Sku).ProductID)
-	}
-	products, err := db.FindAllFromPK(front.ProductTable, args...)
-	if AbortWithoutNoRecord(c, err) {
-		return
+	var products []reform.Struct
+	if len(skus) != 0 {
+		args = nil
+		for _, item := range skus {
+			args = append(args, item.(*front.Sku).ProductID)
+		}
+		products, err = db.FindAllFromPK(front.ProductTable, args...)
+		if AbortWithoutNoRecord(c, err) {
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, &front.CartResponse{
