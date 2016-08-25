@@ -16,6 +16,7 @@ import (
 	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/reform"
+	"github.com/golang/glog"
 )
 
 type WxPaier interface {
@@ -67,17 +68,20 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		return nil, cerr.InvalidSkuId
 	}
 
-	gbs, err := db.FindAllFromPK(front.GroupBuyItemTable, groupbuyIds...)
-	if err != nil {
-		return nil, err
-	}
-	if len(gbs) != len(groupbuyIds) {
-		return nil, cerr.InvalidGroupbuyId
-	}
 	gbMap := make(map[uint]*front.GroupBuyItem)
-	for _, gbi := range gbs {
-		gb := gbi.(*front.GroupBuyItem)
-		gbMap[gb.SkuID] = gb
+	if len(groupbuyIds) != 0 {
+		gbs, err := db.FindAllFromPK(front.GroupBuyItemTable, groupbuyIds...)
+		if err != nil {
+			return nil, err
+		}
+		if len(gbs) != len(groupbuyIds) {
+			return nil, cerr.InvalidGroupbuyId
+		}
+		for _, gbi := range gbs {
+			gb := gbi.(*front.GroupBuyItem)
+			gbMap[gb.SkuID] = gb
+		}
+
 	}
 
 	// compute part of order item, prepare for query products
@@ -463,7 +467,7 @@ func (dbs *DbService) PrepayOrder(
 		}
 
 		var flow front.CapitalFlow
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 		if err = db.DsSelectOneTo(&flow, ds); err != nil {
 			return
 		}
@@ -498,7 +502,7 @@ func (dbs *DbService) PrepayOrder(
 		}
 
 		var points front.PointsItem
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 		if err = db.DsSelectOneTo(&points, ds); err != nil {
 			return
 		}
@@ -553,7 +557,12 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		return
 	}
 
-	if err = models.ComparePaykey([]byte(tokUsr.Paykey), []byte(payload.Key)); err != nil {
+	if tokUsr.Paykey == nil {
+		err = cerr.PaykeyNeedBeSet
+		return
+	}
+
+	if err = models.ComparePaykey(*tokUsr.Paykey, []byte(payload.Key)); err != nil {
 		err = cerr.InvalidPaykey
 		return
 	}
@@ -580,8 +589,9 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		}
 
 		var flow front.CapitalFlow
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 		if err = db.DsSelectOneTo(&flow, ds); err != nil {
+			glog.Errorln(err)
 			return
 		}
 
@@ -599,6 +609,7 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 			OrderID:   order.ID,
 		})
 		if err != nil {
+			glog.Errorln(err)
 			return
 		}
 	}
@@ -610,8 +621,9 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		}
 
 		var points front.PointsItem
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 		if err = db.DsSelectOneTo(&points, ds); err != nil {
+			glog.Errorln(err)
 			return
 		}
 
@@ -629,6 +641,7 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 			OrderID:   order.ID,
 		})
 		if err != nil {
+			glog.Errorln(err)
 			return
 		}
 	}
@@ -690,7 +703,7 @@ func (dbs *DbService) OrderChangeState(
 				if flow2.ID == 0 {
 					// not refund yet
 					var flow1 front.CapitalFlow
-					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 					if err = db.DsSelectOneTo(&flow1, ds); err != nil {
 						return
 					}
@@ -729,7 +742,7 @@ func (dbs *DbService) OrderChangeState(
 				if points2.ID == 0 {
 					// not refund yet
 					var points1 front.PointsItem
-					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 					if err = db.DsSelectOneTo(&points1, ds); err != nil {
 						return
 					}
@@ -833,6 +846,7 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 	}
 
 	if err = PermitOrderState(order, claims.State); err != nil {
+		glog.Errorln(order.State)
 		err = cerr.NoWayToTargetState
 		return
 	}
@@ -876,10 +890,10 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 		order.ReturnedAt = now
 		refundCol = "ReturnedAt"
 	default:
-		err = cerr.NoWayToTargetState
+		err = cerr.NoPermToState
 	}
 
-	if err != nil {
+	if refundCol == "" || err != nil {
 		return
 	}
 
@@ -887,10 +901,12 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims, pa
 	order.PointsRefund = claims.PointsRefund
 	order.WxRefund = claims.WxRefund
 
-	cashLocked, pointsLocked, err = dbs.orderRefund(claims.AminId, claims.UserId, order, paier)
+	cashLocked, pointsLocked, err = dbs.orderRefund(claims.AdminId, claims.UserId, order, paier)
 	if err == nil {
+		// TODO fix refundCol==""
 		err = db.UpdateColumns(order, refundCol, "State", "WxRefundID")
 	}
+	glog.Errorln(err)
 	return
 }
 
@@ -913,7 +929,7 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order, paie
 		if flow.ID == 0 {
 			// not refund yet
 			var flow1 front.CapitalFlow
-			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc())
 			if err = db.DsSelectOneTo(&flow1, ds); err != nil {
 				return
 			}
@@ -946,7 +962,7 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order, paie
 		if points.ID == 0 {
 			// not refund yet
 			var points1 front.PointsItem
-			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc().NullsLast())
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc())
 			if err = db.DsSelectOneTo(&points1, ds); err != nil {
 				return
 			}

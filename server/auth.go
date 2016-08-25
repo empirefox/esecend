@@ -87,5 +87,5 @@ func (s *Server) MustAdmin(c *gin.Context) {
 }
 
 func (s *Server) AdminClaims(c *gin.Context) *admin.Claims {
-	return c.Keys[s.Admin.GinAdminKey].(*jwt.Token).Claims.(*admin.Claims)
+	return c.Keys[s.Admin.GinAdminKey].(*admin.Claims)
 }

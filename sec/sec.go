@@ -1,7 +1,6 @@
 package security
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,7 +60,7 @@ func (h *Handler) Login(userinfo *mpoauth2.UserInfo) (interface{}, error) {
 		usr = models.User{
 			OpenId:       userinfo.OpenId,
 			UnionId:      userinfo.UnionId,
-			RefreshToken: sql.RawBytes(encRefreshToken),
+			RefreshToken: &encRefreshToken,
 			Privilege:    strings.Join(userinfo.Privilege, "|"),
 			CreatedAt:    time.Now().Unix(),
 
@@ -73,7 +72,7 @@ func (h *Handler) Login(userinfo *mpoauth2.UserInfo) (interface{}, error) {
 		}
 		err = db.Insert(&usr)
 	} else if err == nil {
-		usr.RefreshToken = sql.RawBytes(encRefreshToken)
+		usr.RefreshToken = &encRefreshToken
 		usr.SigninAt = time.Now().Unix()
 		err = db.UpdateColumns(&usr, "RefreshToken", "SigninAt")
 	}
@@ -146,10 +145,10 @@ func (h *Handler) RefreshToken(tok *jwt.Token, refreshToken []byte) (token *stri
 	if err = h.db.GetDB().FindByPrimaryKeyTo(&usr, claims.UserId); err != nil {
 		return nil, err
 	}
-	if len(usr.RefreshToken) == 0 {
+	if usr.RefreshToken == nil || len(*usr.RefreshToken) == 0 {
 		return nil, cerr.NoRefreshToken
 	}
-	if err = h.CompareRefreshToken([]byte(usr.RefreshToken), refreshToken); err != nil {
+	if err = h.CompareRefreshToken(*usr.RefreshToken, refreshToken); err != nil {
 		return nil, cerr.InvalidRefreshToken
 	}
 

@@ -12,6 +12,7 @@ const (
 	TCapitalFlowTrade
 	TCapitalFlowRefund
 	TCapitalFlowWithdraw
+	TCapitalFlowRecharge
 )
 
 type PointsType int

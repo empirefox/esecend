@@ -55,9 +55,10 @@ func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payloa
 			return cerr.OrderEvalTimeout
 		}
 
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID))
+		// because payload is EvalItem
+		ds = dbs.DS.Where(goqu.I(front.OrderItemTable.ToCol("UserID")).Eq(tokUsr.ID))
 		if itemId == 0 {
-			ds = ds.Where(goqu.I("$OrderID").Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
+			ds = ds.Where(goqu.I(front.OrderItemTable.ToCol("OrderID")).Eq(orderId)).Where(goqu.I("$EvalAt").IsNull())
 		} else {
 			ds = ds.Where(goqu.I(front.OrderItemTable.PK()).Eq(itemId))
 		}

@@ -52,7 +52,7 @@ func (s *Server) BuildEngine() error {
 
 	// for admin
 	a := router.Group("/admin", s.MustAdmin)
-	a.POST("/order_state", s.PostMgrOrderState)
+	a.GET("/order_state", s.GetMgrOrderState)
 
 	router.POST(s.Config.Security.WxOauthPath, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
@@ -84,7 +84,7 @@ func (s *Server) BuildEngine() error {
 	router.POST("/order_pay", auth, mustAuthed, s.PostOrderPay)
 	router.POST("/order_wx_pay", auth, mustAuthed, s.PostOrderWxPrepay)
 	router.GET("/order/:id", auth, mustAuthed, s.GetOrder)
-	router.POST("/order_state/:id", auth, mustAuthed, s.PostEval)
+	router.POST("/order_state", auth, mustAuthed, s.PostOrderState)
 	router.GET("/paied_order/:id", auth, mustAuthed, s.GetPaidOrder)
 	router.POST("/eval/:id", auth, mustAuthed, s.PostEval)
 	router.GET("/cart", auth, mustAuthed, s.GetCart)

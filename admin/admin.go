@@ -13,7 +13,7 @@ import (
 
 type Claims struct {
 	jwt.StandardClaims
-	AminId  uint `json:"aid"`
+	AdminId  uint `json:"aid"`
 	UserId  uint `json:"uid"`
 	OrderID uint `json:"oid"`
 

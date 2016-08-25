@@ -1,10 +1,6 @@
 package dbsrv
 
-import (
-	"database/sql"
-
-	"github.com/empirefox/esecend/models"
-)
+import "github.com/empirefox/esecend/models"
 
 func (dbs *DbService) FindUserByPhone(phone string) (*models.User, error) {
 	usr, err := dbs.GetDB().FindOneFrom(models.UserTable, "$Phone", phone)
@@ -32,7 +28,7 @@ func (dbs *DbService) UserSavePhone(id uint, phone string) (*models.User, error)
 func (dbs *DbService) UserSetPaykey(id uint, paykey []byte) error {
 	data := models.User{
 		ID:     id,
-		Paykey: sql.RawBytes(paykey),
+		Paykey: &paykey,
 	}
 	return dbs.GetDB().UpdateColumns(&data, "Paykey")
 }

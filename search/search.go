@@ -93,9 +93,9 @@ func (c *Context) HandleQueryOrder() (hasOrder bool) {
 	if col, ok := c.Resource.View.HasCol(orders[0]); ok {
 		order := goqu.I(col)
 		if l == 2 && orders[1] == "desc" {
-			c.DS = c.DS.Order(order.Desc().NullsLast())
+			c.DS = c.DS.Order(order.Desc())
 		} else {
-			c.DS = c.DS.Order(order.Asc().NullsLast())
+			c.DS = c.DS.Order(order.Asc())
 		}
 		return true
 	}

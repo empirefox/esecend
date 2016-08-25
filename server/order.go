@@ -93,7 +93,7 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 	c.JSON(http.StatusOK, &order)
 }
 
-func (s *Server) PostMgrOrderState(c *gin.Context) {
+func (s *Server) GetMgrOrderState(c *gin.Context) {
 	claims := s.AdminClaims(c)
 
 	var order front.Order

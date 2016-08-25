@@ -7,7 +7,7 @@ import "github.com/empirefox/reform"
 type Product struct {
 	ID         uint   `reform:"product_id,pk"`
 	Name       string `reform:"product_name"`
-	Img        string `reform:"img"`
+	Img        string `reform:"photo"`
 	Intro      string `reform:"intro"`
 	Detail     string `reform:"detail"`
 	Saled      uint   `reform:"saleCount"`

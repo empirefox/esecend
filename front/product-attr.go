@@ -5,7 +5,7 @@ import "github.com/empirefox/reform"
 
 //reform:cc_product_attribute
 type ProductAttr struct {
-	ID      uint   `reform:"id,pk"`
+	ID      uint   `reform:"att_id,pk"`
 	Value   string `reform:"attribute_value"`
 	GroupID uint   `reform:"att_group_id"`
 	Pos     int64  `reform:"pos"`

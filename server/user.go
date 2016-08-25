@@ -122,9 +122,14 @@ func (s *Server) PostBindPhone(c *gin.Context) {
 		return
 	}
 
+	if usr.RefreshToken == nil || len(*usr.RefreshToken) == 0 {
+		c.JSON(http.StatusOK, &EmptyObjectJson)
+		return
+	}
+
 	var now int64
 	refreshToken := []byte(data.RefreshToken)
-	if len(refreshToken) > 0 && s.SecHandler.CompareRefreshToken([]byte(usr.RefreshToken), refreshToken) == nil {
+	if len(refreshToken) > 0 && s.SecHandler.CompareRefreshToken(*usr.RefreshToken, refreshToken) == nil {
 		now = time.Now().Unix()
 	} else {
 		now = s.Claims(c).IssuedAt

@@ -47,6 +47,18 @@ func newServer() *Server {
 		panic(err)
 	}
 
+	//	paykey, err := models.EncPaykey([]byte("123456"), 10)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	err = dbs.GetDB().UpdateColumns(&models.User{
+	//		ID:     1,
+	//		Paykey: paykey,
+	//	}, "Paykey")
+	//	if err != nil {
+	//		panic(err)
+	//	}
+
 	wxClient, err := wx.NewWxClient(conf, dbs)
 	if err != nil {
 		panic(err)
@@ -98,7 +110,7 @@ func newServer() *Server {
 
 	router := gin.Default()
 	a := router.Group("/admin", s.MustAdmin)
-	a.POST("/order_state", s.PostMgrOrderState)
+	a.GET("/order_state", s.GetMgrOrderState)
 
 	router.POST(s.Config.Security.WxOauthPath, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
@@ -130,7 +142,7 @@ func newServer() *Server {
 	router.POST("/order_pay", auth, mustAuthed, s.PostOrderPay)
 	router.POST("/order_wx_pay", auth, mustAuthed, s.PostOrderWxPrepay)
 	router.GET("/order/:id", auth, mustAuthed, s.GetOrder)
-	router.POST("/order_state/:id", auth, mustAuthed, s.PostEval)
+	router.POST("/order_state", auth, mustAuthed, s.PostOrderState)
 	router.GET("/paied_order/:id", auth, mustAuthed, s.GetPaidOrder)
 	router.POST("/eval/:id", auth, mustAuthed, s.PostEval)
 	router.GET("/cart", auth, mustAuthed, s.GetCart)

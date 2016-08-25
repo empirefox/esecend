@@ -2,8 +2,6 @@
 package models
 
 import (
-	"database/sql"
-
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/empirefox/esecend/front"
@@ -48,9 +46,9 @@ type User struct {
 	// RefreshToken is not lookup every time
 	// Only query when need refresh
 	// Remove when logout
-	RefreshToken sql.RawBytes `reform:"refresh_token"` // bcrypt, no expires
+	RefreshToken *[]byte `reform:"refresh_token"` // bcrypt, no expires
 
-	Paykey sql.RawBytes `reform:"paykey"` // for pay, user set, bcrypt
+	Paykey *[]byte `reform:"paykey"` // for pay, user set, bcrypt
 }
 
 func (u *User) Info() *front.UserInfo {
@@ -60,6 +58,6 @@ func (u *User) Info() *front.UserInfo {
 		City:         u.City,
 		Province:     u.Province,
 		HeadImageURL: u.HeadImageURL,
-		HasPayKey:    len(u.Paykey) > 0,
+		HasPayKey:    u.Paykey != nil && len(*u.Paykey) > 0,
 	}
 }

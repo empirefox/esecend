@@ -51,12 +51,14 @@ const (
 	InvalidCheckoutTotal
 	InvalidCheckoutFreight
 	InvalidPaykey
+	PaykeyNeedBeSet
 	NotEnoughMoney
 	NotEnoughPoints
 	InvalidPayAmount
 	NotNopayState
 	NoWayToPaidState
 	NoWayToTargetState
+	NoPermToState
 	OrderClosed
 	OrderCloseNeeded
 	OrderTmpLocked
