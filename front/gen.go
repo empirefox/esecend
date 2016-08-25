@@ -1,3 +1,2 @@
-//go:generate const_list -type=TradeState,CapitalFlowType
-//go:generate mapconst -type=TradeState,CapitalFlowType
+//go:generate mapconst -type=TradeState,CapitalFlowType,PointsType
 package front
