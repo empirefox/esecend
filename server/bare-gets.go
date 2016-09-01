@@ -27,6 +27,7 @@ func (s *Server) GetProfile(c *gin.Context) {
 		// Config.Order
 		EvalTimeoutDay:        s.Config.Order.EvalTimeoutDay,
 		CompleteTimeoutDay:    s.Config.Order.CompleteTimeoutDay,
+		HistoryTimeoutDay:     s.Config.Order.HistoryTimeoutDay,
 		CheckoutExpiresMinute: s.Config.Order.CheckoutExpiresMinute,
 		WxPayExpiresMinute:    s.Config.Order.WxPayExpiresMinute,
 		Point2Cent:            s.Config.Order.Point2Cent,
@@ -120,18 +121,18 @@ func (s *Server) GetWishlist(c *gin.Context) {
 func (s *Server) GetWallet(c *gin.Context) {
 	db := s.DB.GetDB()
 	tokUsr := s.TokenUser(c)
-	capitalFlows, err := db.FindAllFrom(front.CapitalFlowTable, "$UserID", tokUsr.ID)
+	userCashess, err := db.FindAllFrom(front.UserCashTable, "$UserID", tokUsr.ID)
 	if AbortWithoutNoRecord(c, err) {
 		return
 	}
-	pointsList, err := db.FindAllFrom(front.PointsItemTable, "$UserID", tokUsr.ID)
-	if AbortWithoutNoRecord(c, err) {
-		return
-	}
+	// pointsList, err := db.FindAllFrom(front.PointsItemTable, "$UserID", tokUsr.ID)
+	// if AbortWithoutNoRecord(c, err) {
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, &front.Wallet{
-		CapitalFlows: capitalFlows,
-		PointsList:   pointsList,
+		UserCashs: userCashess,
+		// PointsList:   pointsList,
 	})
 }
 

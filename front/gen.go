@@ -1,2 +1,2 @@
-//go:generate mapconst -type=TradeState,CapitalFlowType,PointsType
+//go:generate mapconst -type=TradeState,UserCashType
 package front

@@ -19,12 +19,20 @@ type Security struct {
 }
 
 type Order struct {
-	EvalTimeoutDay        time.Duration
-	CompleteTimeoutDay    time.Duration
+	EvalTimeoutDay        uint
+	CompleteTimeoutDay    uint
+	HistoryTimeoutDay     uint
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	Point2Cent            uint
 	FreeDeliverLine       uint
+}
+
+type Money struct {
+	StoreSaleFeePercent    uint
+	User1RebatePercent     uint
+	Store1RebatePercent    uint
+	UserCashUnfrozenStages uint
 }
 
 type Weixin struct {
@@ -68,6 +76,7 @@ type Paging struct {
 type Config struct {
 	Security Security
 	Order    Order
+	Money    Money
 	Weixin   Weixin
 	Alidayu  Alidayu
 	Mysql    Mysql

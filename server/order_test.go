@@ -59,10 +59,10 @@ func TestOrder(t *testing.T) {
 
 	// 3. recharge money
 	db := server.DB.GetDB()
-	err = db.Insert(&front.CapitalFlow{
+	err = db.Insert(&front.UserCash{
 		UserID:    1,
 		CreatedAt: now,
-		Type:      front.TCapitalFlowRecharge,
+		Type:      front.TUserCashRecharge,
 		Amount:    60000,
 		Balance:   60000,
 	})

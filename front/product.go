@@ -15,6 +15,8 @@ type Product struct {
 	SaledAt    int64  `reform:"time_sale"`
 	ShelfOffAt int64  `reform:"time_shelfoff"`
 	CategoryID uint   `reform:"cate_id"`
+	StoreID    uint   `reform:"sale_user_id"`
+	IsABC      bool   `reform:"is_abc"`
 }
 
 //reform:cc_product_sku_att

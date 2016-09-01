@@ -33,6 +33,7 @@ const (
 	TOrderStateCompleted
 	TOrderStateEvalStarted
 	TOrderStateEvaled
+	TOrderStateHistory
 )
 
 //reform:cc_order_item
@@ -42,6 +43,8 @@ type OrderItem struct {
 	OrderID    uint   `reform:"order_id"`
 	ProductID  uint   `reform:"product_id"`
 	SkuID      uint   `reform:"sku_id"`
+	StoreID    uint   `reform:"store_id"`
+	IsABC      bool   `reform:"is_abc"`
 	Quantity   uint   `reform:"product_count"`
 	Price      uint   `reform:"product_price"`
 	CreatedAt  int64  `reform:"created_time"`
@@ -49,6 +52,8 @@ type OrderItem struct {
 	Img        string `reform:"img"`
 	Attrs      string `reform:"attrs"`
 	DeliverFee uint   `reform:"deliver_fee"`
+
+	Store1 uint `reform:"store1"  json:"-"`
 
 	// EvalItem
 	Eval        string `reform:"comment_content"`
@@ -67,11 +72,10 @@ type Order struct {
 	ID              uint   `reform:"id,pk"`
 	PayAmount       uint   `reform:"pay_amount"`
 	WxPaid          uint   `reform:"wx_paid"`
-	CashPaid        uint   `reform:"cash_paid"`
-	PointsPaid      uint   `reform:"points_paid"`
 	WxRefund        uint   `reform:"wx_refund"`
+	CashPaid        uint   `reform:"cash_paid"`
 	CashRefund      uint   `reform:"cash_refund"`
-	PointsRefund    uint   `reform:"points_refund"`
+	PointsPaid      uint   `reform:"points_paid"`
 	AbandonedReason string `reform:"abandoned_reason"`
 	Remark          string `reform:"remark"`
 	UserID          uint   `reform:"user_id" json:"-"` // check owner only
@@ -100,11 +104,21 @@ type Order struct {
 	CompletedAt     int64      `reform:"completed_at"`
 	EvalStartedAt   int64      `reform:"eval_started_at"`
 	EvalAt          int64      `reform:"eval_at"`
+	HistoryAt       int64      `reform:"history_at"`
+
+	// auto set by system
+	AutoCompleted bool `reform:"auto_completed"`
+	AutoEvaled    bool `reform:"auto_evaled"`
+
+	Rebated bool `reform:"rebated" json:"-"`
+	User1   uint `reform:"user1"   json:"-"`
+
+	PointsPayOnly bool `reform:"points_pay_only"`
 
 	// weixin
-	TransactionId string     `reform:"transaction_id"`
-	TradeState    TradeState `reform:"trade_state"`
-	WxRefundID    string     `reform:"refund_id"`
+	TransactionId string     `reform:"transaction_id" json:"-"`
+	TradeState    TradeState `reform:"trade_state"    json:"-"`
+	WxRefundID    string     `reform:"refund_id"      json:"-"`
 
 	// Invoice
 	InvoiceTo    string `reform:"invoice_to"`
@@ -161,11 +175,10 @@ type OrderPrepayPayload struct {
 	OrderID uint
 	Amount  uint
 
-	Cash   uint
-	Wx     uint
-	Points uint // just points not cents
+	Cash uint
+	Wx   uint
 
-	Ip string
+	Ip string // inner
 }
 
 type OrderPrepayResponse struct {
@@ -175,9 +188,6 @@ type OrderPrepayResponse struct {
 
 type OrderPayPayload struct {
 	Key     string
-	Amount  uint
 	OrderID uint
-
-	Cash   uint
-	Points uint // just points not cents
+	Amount  uint
 }

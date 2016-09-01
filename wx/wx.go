@@ -201,25 +201,9 @@ func (wc *WxClient) updateWxOrderSate(
 					return
 				}
 
-				ds := dbs.DS.Where(goqu.I(front.CapitalFlowTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-				_, err = dbs.GetDB().DsUpdateColumns(&front.CapitalFlow{
-					Type:      front.TCapitalFlowTrade,
-					CreatedAt: now,
-				}, ds, "Type", "CreatedAt")
-				if err != nil {
-					return
-				}
-			}
-
-			if attach.PrePointsID != 0 {
-				if pointsLocked = lok.PointsLok.Lock(attach.UserID); !pointsLocked {
-					err = cerr.CashTmpLocked
-					return
-				}
-
-				ds := dbs.DS.Where(goqu.I(front.PointsItemTable.PK()).Eq(attach.PrePointsID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-				_, err = dbs.GetDB().DsUpdateColumns(&front.PointsItem{
-					Type:      front.TPointsTrade,
+				ds := dbs.DS.Where(goqu.I(front.UserCashTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
+				_, err = dbs.GetDB().DsUpdateColumns(&front.UserCash{
+					Type:      front.TUserCashTrade,
 					CreatedAt: now,
 				}, ds, "Type", "CreatedAt")
 				if err != nil {

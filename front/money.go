@@ -3,56 +3,66 @@ package front
 
 import "github.com/empirefox/reform"
 
-type CapitalFlowType int
+type UserCashType int
 
 const (
-	TCapitalFlowUnknown CapitalFlowType = iota
-	TCapitalFlowPrepay
-	TCapitalFlowPrepayBack
-	TCapitalFlowTrade
-	TCapitalFlowRefund
-	TCapitalFlowWithdraw
-	TCapitalFlowRecharge
-)
-
-type PointsType int
-
-const (
-	TPointsUnkonwn PointsType = iota
-	TPointsReward
-	TPointsPrepay
-	TPointsPrepayBack
-	TPointsTrade
-	TPointsRefund
+	TUserCashUnknown UserCashType = iota
+	TUserCashPrepay
+	TUserCashPrepayBack
+	TUserCashTrade
+	TUserCashRefund
+	TUserCashWithdraw
+	TUserCashRecharge
+	TUserCashRebate
+	TUserCashStoreRebate
 )
 
 //reform:cc_member_account_log
-type CapitalFlow struct {
-	ID        uint            `reform:"id,pk"`
-	UserID    uint            `reform:"user_id" json:"-"`
-	CreatedAt int64           `reform:"create_time"`
-	Type      CapitalFlowType `reform:"log_type"`
-	Reason    string          `reform:"reason"`
-	Amount    int             `reform:"amount"`
-	Balance   int             `reform:"balance"`
-	OrderID   uint            `reform:"order_id"`
+type UserCash struct {
+	ID        uint         `reform:"id,pk"`
+	UserID    uint         `reform:"user_id" json:"-"`
+	CreatedAt int64        `reform:"create_time"`
+	Type      UserCashType `reform:"log_type"`
+	Remark    string       `reform:"remark"`
+	Amount    int          `reform:"amount"`
+	Balance   int          `reform:"balance"`
+	OrderID   uint         `reform:"order_id"`
+}
+
+//reform:cc_user_cash_unfrozen
+type UserCashUnfrozen struct {
+	ID        uint  `reform:"id,pk"`
+	FrozenID  uint  `reform:"frozen_id"`
+	CreatedAt int64 `reform:"create_at"`
+	Amount    uint  `reform:"amount"`
+}
+
+//reform:cc_user_cash_frozen
+type UserCashFrozen struct {
+	ID        uint   `reform:"id,pk"`
+	UserID    uint   `reform:"user_id" json:"-"`
+	CreatedAt int64  `reform:"create_at"`
+	Remark    string `reform:"remark"`
+	Total     uint   `reform:"total"`
+	Stages    uint   `reform:"stages"`
+	DoneAt    int64  `reform:"done_at"`
 }
 
 //reform:cc_member_credit_log
 type PointsItem struct {
-	ID        uint       `reform:"id,pk"`
-	UserID    uint       `reform:"user_id" json:"-"`
-	CreatedAt int64      `reform:"create_time"`
-	Type      PointsType `reform:"log_type"`
-	Reason    string     `reform:"reason"`
-	Amount    int        `reform:"amount"`
-	Balance   int        `reform:"balance"`
-	OrderID   uint       `reform:"order_id"`
+	ID        uint  `reform:"id,pk"`
+	UserID    uint  `reform:"user_id" json:"-"`
+	CreatedAt int64 `reform:"create_time"`
+	Amount    int   `reform:"amount"`
+	Balance   int   `reform:"balance"`
+	OrderID   uint  `reform:"order_id"`
 }
 
 type Wallet struct {
-	CapitalFlows []reform.Struct // CapitalFlow
-	PointsList   []reform.Struct // PointsItem
+	Cashes   []reform.Struct // UserCash
+	Frozen   []reform.Struct // UserCashFrozen, exclude DoneAt
+	Unfrozen []reform.Struct // UserCashUnfrozen
+	Points   []reform.Struct // PointsItem
 }
 
 type WxPayArgs struct {

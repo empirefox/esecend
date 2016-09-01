@@ -31,6 +31,8 @@ var orderRules = fsm.CreateRuleset(
 	newTransition(front.TOrderStateEvaled, front.TOrderStateEvaled),      // standalone
 	newTransition(front.TOrderStateEvalStarted, front.TOrderStateEvaled), // standalone
 
+	newTransition(front.TOrderStateEvaled, front.TOrderStateHistory), // system
+
 	newTransition(front.TOrderStateRejecting, front.TOrderStateRejectBack),     // admin
 	newTransition(front.TOrderStateRejectBack, front.TOrderStateRejectRefound), // admin
 

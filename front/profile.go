@@ -5,6 +5,7 @@ import "time"
 
 //reform:cc_profile
 type Profile struct {
+	SaleFeePercent   uint
 	Phone            string `reform:"phone"`
 	DefaultHeadImage string `reform:"default_head_image"`
 }
@@ -16,8 +17,9 @@ type ProfileResponse struct {
 	WxLoginPath string
 
 	// Config.Order
-	EvalTimeoutDay        time.Duration
-	CompleteTimeoutDay    time.Duration
+	EvalTimeoutDay        uint
+	CompleteTimeoutDay    uint
+	HistoryTimeoutDay     uint
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	Point2Cent            uint
