@@ -158,17 +158,14 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		}
 
 		// 4. user1
+		var usr1 models.User
 		total := order.PayAmount - order.DeliverFee
 		toUsr1 := total * dbs.config.Money.User1RebatePercent / 100
 		if order.User1 != 0 {
 			ds := dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(order.User1))
 			count, err1 := db.DsCount(models.UserTable, ds)
-			if err1 != nil {
-				err = err1
-				return
-			}
-			if count != 0 {
-				usr1Map[id] = true
+			err = db.FindByPrimaryKeyTo(&usr1, order.User1)
+			if err == nil {
 				var top front.UserCash
 				ds := dbs.DS.Where(goqu.I("$UserID").Eq(order.User1)).Order(goqu.I("$CreatedAt").Desc())
 				if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
@@ -186,6 +183,8 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				if err != nil {
 					return
 				}
+			} else if err != reform.ErrNoRows {
+				return
 			}
 		}
 
@@ -208,16 +207,22 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		if err != nil {
 			return
 		}
-	}
 
-	var abcs []*front.OrderItem
-	for _, item := range items {
-		if item.IsABC {
-			abcs = append(abcs, item)
+		// ABCs
+		if order.User1 != 0 {
+			var abcs []*front.OrderItem
+			for _, item := range items {
+				if item.IsABC {
+					abcs = append(abcs, item)
+				}
+			}
+			if len(abcs) > 0 {
+				// TODO multi abcs in user1
+				// 1. VipRebateOrigin of user1 from the last year
+				// 2. set vip to user if needed
+				// 3. start rebate of user1 if counter is enough
+			}
 		}
-	}
-	if len(abcs) > 0 {
-		// TODO multi abcs in user1
 	}
 
 	if len(cols) != 0 {

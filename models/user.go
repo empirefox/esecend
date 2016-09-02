@@ -21,6 +21,7 @@ type User struct {
 	Privilege   string `reform:"privilege"`
 	Phone       string `reform:"phone"`
 	Recommended uint   `reform:"parent_id"`
+	VipAt       int64  `reform:"vip_at"`
 
 	CreatedAt int64 `reform:"create_date"`
 	UpdatedAt int64 `reform:"update_date"`
@@ -60,4 +61,15 @@ func (u *User) Info() *front.UserInfo {
 		HeadImageURL: u.HeadImageURL,
 		HasPayKey:    u.Paykey != nil && len(*u.Paykey) > 0,
 	}
+}
+
+//reform:cc_vip_rebate_origin
+type VipRebateOrigin struct {
+	ID        uint  `reform:"id,pk"`
+	UserID    uint  `reform:"user_id"`
+	CreatedAt int64 `reform:"created_at"`
+	OrderID   uint  `reform:"order_id"`
+	Amount    uint  `reform:"amount"`
+	Balance   uint  `reform:"balance"`
+	Counter   uint  `reform:"counter"`
 }

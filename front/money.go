@@ -21,29 +21,42 @@ const (
 type UserCash struct {
 	ID        uint         `reform:"id,pk"`
 	UserID    uint         `reform:"user_id" json:"-"`
-	CreatedAt int64        `reform:"create_time"`
-	Type      UserCashType `reform:"log_type"`
-	Remark    string       `reform:"remark"`
-	Amount    int          `reform:"amount"`
-	Balance   int          `reform:"balance"`
 	OrderID   uint         `reform:"order_id"`
-}
-
-//reform:cc_user_cash_unfrozen
-type UserCashUnfrozen struct {
-	ID        uint  `reform:"id,pk"`
-	FrozenID  uint  `reform:"frozen_id"`
-	CreatedAt int64 `reform:"create_at"`
-	Amount    uint  `reform:"amount"`
+	CreatedAt int64        `reform:"create_time"`
+	Amount    int          `reform:"amount"`
+	Remark    string       `reform:"remark"`
+	Type      UserCashType `reform:"log_type"`
+	Balance   int          `reform:"balance"`
 }
 
 //reform:cc_user_cash_frozen
 type UserCashFrozen struct {
 	ID        uint   `reform:"id,pk"`
 	UserID    uint   `reform:"user_id" json:"-"`
-	CreatedAt int64  `reform:"create_at"`
+	OrderID   uint   `reform:"order_id"`
+	CreatedAt int64  `reform:"created_at"`
+	Amount    uint   `reform:"amount"`
 	Remark    string `reform:"remark"`
-	Total     uint   `reform:"total"`
+	Stages    uint   `reform:"stages"`
+	ThawedAt  int64  `reform:"thawed_at"`
+}
+
+//reform:cc_user_cash_rebate_item
+type UserCashRebateItem struct {
+	ID        uint  `reform:"id,pk"`
+	RebateID  uint  `reform:"rebate_id"`
+	CreatedAt int64 `reform:"created_at"`
+	Amount    uint  `reform:"amount"`
+}
+
+//reform:cc_user_cash_rebate
+type UserCashRebate struct {
+	ID        uint   `reform:"id,pk"`
+	UserID    uint   `reform:"user_id" json:"-"`
+	OrderID   uint   `reform:"order_id"`
+	CreatedAt int64  `reform:"created_at"`
+	Amount    uint   `reform:"amount"`
+	Remark    string `reform:"remark"`
 	Stages    uint   `reform:"stages"`
 	DoneAt    int64  `reform:"done_at"`
 }
@@ -59,10 +72,11 @@ type PointsItem struct {
 }
 
 type Wallet struct {
-	Cashes   []reform.Struct // UserCash
-	Frozen   []reform.Struct // UserCashFrozen, exclude DoneAt
-	Unfrozen []reform.Struct // UserCashUnfrozen
-	Points   []reform.Struct // PointsItem
+	Cashes      []reform.Struct // UserCash
+	Frozen      []reform.Struct // UserCashFrozen, exclude ThawedAt
+	Rebates     []reform.Struct // UserCashRebate, exclude DoneAt
+	RebateItems []reform.Struct // UserCashRebateItem
+	Points      []reform.Struct // PointsItem
 }
 
 type WxPayArgs struct {
