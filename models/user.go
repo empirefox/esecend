@@ -15,13 +15,13 @@ var (
 //reform:cc_member
 type User struct {
 	// claims below 5 fields
-	ID          uint   `reform:"id,pk"`
-	OpenId      string `reform:"open_id"`
-	LevelID     uint   `reform:"level_id"`
-	Privilege   string `reform:"privilege"`
-	Phone       string `reform:"phone"`
-	Recommended uint   `reform:"parent_id"`
-	VipAt       int64  `reform:"vip_at"`
+	ID        uint   `reform:"id,pk"`
+	OpenId    string `reform:"open_id"`
+	Privilege string `reform:"privilege"`
+	Phone     string `reform:"phone"`
+	User1     uint   `reform:"parent_id"`
+	VipAt     int64  `reform:"vip_at"`
+	NextVipAt int64  `reform:"next_vip_at"`
 
 	CreatedAt int64 `reform:"create_date"`
 	UpdatedAt int64 `reform:"update_date"`
@@ -50,6 +50,8 @@ type User struct {
 	RefreshToken *[]byte `reform:"refresh_token"` // bcrypt, no expires
 
 	Paykey *[]byte `reform:"paykey"` // for pay, user set, bcrypt
+
+	NotRebatedCounter uint `reform:"not_rebated_counter"`
 }
 
 func (u *User) Info() *front.UserInfo {
@@ -69,7 +71,9 @@ type VipRebateOrigin struct {
 	UserID    uint  `reform:"user_id"`
 	CreatedAt int64 `reform:"created_at"`
 	OrderID   uint  `reform:"order_id"`
+	ItemID    uint  `reform:"item_id"`
 	Amount    uint  `reform:"amount"`
 	Balance   uint  `reform:"balance"`
-	Counter   uint  `reform:"counter"`
+	User1     uint  `reform:"user1"`
+	User1Used bool  `reform:"user1_used"`
 }

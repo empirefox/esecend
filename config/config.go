@@ -29,10 +29,12 @@ type Order struct {
 }
 
 type Money struct {
-	StoreSaleFeePercent    uint
-	User1RebatePercent     uint
-	Store1RebatePercent    uint
-	UserCashUnfrozenStages uint
+	StoreSaleFeePercent     uint
+	User1RebatePercent      uint
+	Store1RebatePercent     uint
+	UserCashUnfrozenStages  uint
+	RewardFromVipCent       uint
+	RewardFromVipRebateDone uint
 }
 
 type Weixin struct {

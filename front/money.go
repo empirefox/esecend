@@ -12,7 +12,7 @@ const (
 	TUserCashTrade
 	TUserCashRefund
 	TUserCashWithdraw
-	TUserCashRecharge
+	TUserCashReward
 	TUserCashRebate
 	TUserCashStoreRebate
 )
@@ -31,14 +31,15 @@ type UserCash struct {
 
 //reform:cc_user_cash_frozen
 type UserCashFrozen struct {
-	ID        uint   `reform:"id,pk"`
-	UserID    uint   `reform:"user_id" json:"-"`
-	OrderID   uint   `reform:"order_id"`
-	CreatedAt int64  `reform:"created_at"`
-	Amount    uint   `reform:"amount"`
-	Remark    string `reform:"remark"`
-	Stages    uint   `reform:"stages"`
-	ThawedAt  int64  `reform:"thawed_at"`
+	ID        uint         `reform:"id,pk"`
+	UserID    uint         `reform:"user_id" json:"-"`
+	OrderID   uint         `reform:"order_id"`
+	CreatedAt int64        `reform:"created_at"`
+	Type      UserCashType `reform:"typ"`
+	Amount    uint         `reform:"amount"`
+	Remark    string       `reform:"remark"`
+	Stages    uint         `reform:"stages"`
+	ThawedAt  int64        `reform:"thawed_at"`
 }
 
 //reform:cc_user_cash_rebate_item
@@ -51,14 +52,15 @@ type UserCashRebateItem struct {
 
 //reform:cc_user_cash_rebate
 type UserCashRebate struct {
-	ID        uint   `reform:"id,pk"`
-	UserID    uint   `reform:"user_id" json:"-"`
-	OrderID   uint   `reform:"order_id"`
-	CreatedAt int64  `reform:"created_at"`
-	Amount    uint   `reform:"amount"`
-	Remark    string `reform:"remark"`
-	Stages    uint   `reform:"stages"`
-	DoneAt    int64  `reform:"done_at"`
+	ID        uint         `reform:"id,pk"`
+	UserID    uint         `reform:"user_id" json:"-"`
+	OrderID   uint         `reform:"order_id"`
+	CreatedAt int64        `reform:"created_at"`
+	Type      UserCashType `reform:"typ"`
+	Amount    uint         `reform:"amount"`
+	Remark    string       `reform:"remark"`
+	Stages    uint         `reform:"stages"`
+	DoneAt    int64        `reform:"done_at"`
 }
 
 //reform:cc_member_credit_log
