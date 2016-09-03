@@ -218,8 +218,8 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		var abcItem *front.OrderItem
 		if len(items) == 1 && items[0].IsABC {
 			abcItem = items[0]
-			// 1. save VipRebateOrigin to user
-			err = db.Insert(&models.VipRebateOrigin{
+			// 1. VipRebateOrigin of user
+			userVip := models.VipRebateOrigin{
 				UserID:    order.UserID,
 				CreatedAt: order.CreatedAt,
 				OrderID:   order.ID,
@@ -227,9 +227,6 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				Amount:    abcItem.Price,
 				Balance:   abcItem.Price,
 				User1:     order.User1,
-			})
-			if err != nil {
-				return
 			}
 
 			var usr models.User
@@ -311,16 +308,26 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				if usr1.VipAt < begin {
 					usr1.VipAt, usr1.NextVipAt = usr1.NextVipAt, 0
 				}
+
+				// 4.0 find all VipRebateOrigin from next level users of user1
+				ds = dbs.DS.Where(goqu.I("$User1").Eq(order.User1), goqu.I("$User1Used").IsNotTrue())
+				var user1NextLevelVips []reform.Struct
+				user1NextLevelVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
+				if err != nil {
+					return
+				}
+				lUser1NextLevelVips := len(user1NextLevelVips)
+
 				if usr1.VipAt < begin {
 					// not vip
 					usr1.VipAt = 0
 					if usr1WasVip {
 						// 4.1 rebate counter to user1 cash if user1 is not vip but was right now
 						// we DO NOT record order_id
-						if usr1.NotRebatedCounter > 1 {
-							log.Errorln("NotRebatedCounter err:", usr1.NotRebatedCounter)
+						if lUser1NextLevelVips > 1 {
+							log.Errorln("lUser1NextLevelVips err:", lUser1NextLevelVips)
 						}
-						for i := 0; i < usr1.NotRebatedCounter; i++ {
+						for _, ivip := range user1NextLevelVips {
 							usr1CashBalance += int(dbs.config.Money.RewardFromVipCent)
 							err = db.Insert(&front.UserCash{
 								UserID:    order.User1,
@@ -328,31 +335,43 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 								Type:      front.TUserCashReward,
 								Amount:    int(dbs.config.Money.RewardFromVipCent),
 								Balance:   usr1CashBalance,
-								Remark:    "VIP expires auto reward",
+								OrderID:   ivip.(*models.VipRebateOrigin).OrderID,
 							})
 							if err != nil {
 								return
 							}
 						}
-						// set 1 to new vip lifecycle
-						usr1.NotRebatedCounter = 1
-					} else {
-						// 4.2 just add to NotRebatedCounter if user1 is not vip
-						usr1.NotRebatedCounter++
+						_, err = db.DsUpdateColumns(&models.VipRebateOrigin{User1Used: true}, ds, "User1Used")
+						if err != nil {
+							return
+						}
 					}
-					// not vip end
+					// 4.2 freeze reward to user1, set user vip to used
+					err = db.Insert(&front.UserCashFrozen{
+						UserID:    order.User1,
+						OrderID:   order.ID,
+						CreatedAt: now,
+						Type:      front.TUserCashReward,
+						Amount:    int(dbs.config.Money.RewardFromVipCent),
+						Stages:    0,
+						ThawedAt:  0,
+					})
+					if err != nil {
+						return
+					}
+					userVip.User1Used = true
 				} else {
 					// 4.3 user1 is vip, so we can check if needing rebate or reward
-					// get current VipRebateOrigin
+					// There must be a vip, so get current VipRebateOrigin
 					ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.User1), goqu.I("$CreatedAt").Eq(usr1.VipAt))
-					var rebateOrigin models.VipRebateOrigin
-					err = db.DsSelectOneTo(&rebateOrigin, ds)
+					var user1Vip models.VipRebateOrigin
+					err = db.DsSelectOneTo(&user1Vip, ds)
 					if err != nil {
 						return
 					}
 
-					if rebateOrigin.Balance == 0 {
-						// 4.4 reward to user1
+					if user1Vip.Balance == 0 {
+						// 4.4 reward to user1, set user vip to used
 						usr1CashBalance += int(dbs.config.Money.RewardFromVipCent)
 						err = db.Insert(&front.UserCash{
 							UserID:    order.User1,
@@ -365,22 +384,49 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 						if err != nil {
 							return
 						}
+						userVip.User1Used = true
 					} else {
 						// 4.5 rebate to user1
-						usr1.NotRebatedCounter++
-						if usr1.NotRebatedCounter >= 2 {
-							usr1.NotRebatedCounter -= 2
-							// 4.5.1 find all VipRebateOrigin from next level users of user1
-							ds := dbs.DS.Where(goqu.I("$User1").Eq(order.User1), goqu.I("$User1Used").IsNotTrue())
-							if rebateOrigin.Balance == rebateOrigin.Amount {
-								toRebate := rebateOrigin.Amount / 2
-								rebateOrigin.Balance = rebateOrigin.Amount - toRebate
+						lUser1NextLevelVips++
+						if lUser1NextLevelVips >= 2 {
+							lUser1NextLevelVips -= 2
+							// 4.5.1 find 2vips of the same amount with user
+							var sames []*models.VipRebateOrigin
+							var nextVipsAllAmount uint
+							var lowest uint
+							var highest uint
+							// TODO add userVip to user1NextLevelVips without ID set
+							for _, ivip := range user1NextLevelVips {
+								amount := ivip.(*models.VipRebateOrigin).Amount
+								nextVipsAllAmount += amount
+								if amount == user1Vip.Amount {
+									sames = append(sames, ivip.(*models.VipRebateOrigin))
+								}
+								if amount < lowest || lowest == 0 {
+									lowest = amount
+								}
+								if amount > highest || highest == 0 {
+									highest = amount
+								}
+							}
+							// TODO compute which next vips to use?
+							if len(sames) >= 2 {
+								_, err = db.DsUpdateColumns(&models.VipRebateOrigin{User1Used: true}, ds, "User1Used")
+							}
+
+							if user1Vip.Balance == user1Vip.Amount {
+								toRebate := user1Vip.Amount / 2
+								user1Vip.Balance = user1Vip.Amount - toRebate
 							}
 						}
 					}
 
 				}
 
+			}
+
+			if err = db.Insert(&userVip); err != nil {
+				return
 			}
 		}
 
