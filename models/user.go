@@ -69,11 +69,12 @@ func (u *User) Info() *front.UserInfo {
 type VipRebateOrigin struct {
 	ID        uint  `reform:"id,pk"`
 	UserID    uint  `reform:"user_id"`
-	CreatedAt int64 `reform:"created_at"`
+	CreatedAt int64 `reform:"created_at"` // TODO change to effective time
 	OrderID   uint  `reform:"order_id"`
 	ItemID    uint  `reform:"item_id"`
 	Amount    uint  `reform:"amount"`
 	Balance   uint  `reform:"balance"`
 	User1     uint  `reform:"user1"`
 	User1Used bool  `reform:"user1_used"`
+	IsCurrent bool  `reform:"is_current"`
 }

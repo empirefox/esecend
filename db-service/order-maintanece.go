@@ -221,7 +221,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 			// 1. VipRebateOrigin of user
 			userVip := models.VipRebateOrigin{
 				UserID:    order.UserID,
-				CreatedAt: order.CreatedAt,
+				CreatedAt: order.CreatedAt, //TODO how is the field?
 				OrderID:   order.ID,
 				ItemID:    abcItem.ID,
 				Amount:    abcItem.Price,
@@ -310,13 +310,13 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				}
 
 				// 4.0 find all VipRebateOrigin from next level users of user1
+				// TODO effective time?
 				ds = dbs.DS.Where(goqu.I("$User1").Eq(order.User1), goqu.I("$User1Used").IsNotTrue())
 				var user1NextLevelVips []reform.Struct
 				user1NextLevelVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
 				if err != nil {
 					return
 				}
-				lUser1NextLevelVips := len(user1NextLevelVips)
 
 				if usr1.VipAt < begin {
 					// not vip
@@ -324,6 +324,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 					if usr1WasVip {
 						// 4.1 rebate counter to user1 cash if user1 is not vip but was right now
 						// we DO NOT record order_id
+						lUser1NextLevelVips := len(user1NextLevelVips)
 						if lUser1NextLevelVips > 1 {
 							log.Errorln("lUser1NextLevelVips err:", lUser1NextLevelVips)
 						}
@@ -386,7 +387,13 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 						}
 						userVip.User1Used = true
 					} else {
-						// 4.5 rebate to user1
+						// 4.5 rebate to user1, the next vip must be the current of the next user.
+						// If not also do reward.
+
+						// 4.5.1 split vips to [userCurrent, userNext].
+						// TODO add expires?
+
+						// 4.5.2 discard userNext?
 						lUser1NextLevelVips++
 						if lUser1NextLevelVips >= 2 {
 							lUser1NextLevelVips -= 2
