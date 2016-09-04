@@ -41,7 +41,8 @@ func (dbs *DbService) OrdersMaintanence() error {
 
 func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order, err error) {
 	db := dbs.GetDB()
-	now := time.Now().Unix()
+	tnow := time.Now()
+	now := tnow.Unix()
 
 	var cols []string
 
@@ -84,7 +85,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				if to, ok := toStoreMap[item.StoreID]; ok {
 					toStoreMap[item.StoreID] = to + item.Price*item.Quantity
 				} else {
-					toStoreMap[item.Store1] = item.Price * item.Quantity
+					toStoreMap[item.StoreID] = item.Price * item.Quantity
 				}
 			}
 			if item.Store1 != 0 {
@@ -218,33 +219,60 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		var abcItem *front.OrderItem
 		if len(items) == 1 && items[0].IsABC {
 			abcItem = items[0]
-			// 1. VipRebateOrigin of user
+			// 1 common VipRebateOrigin of user
 			userVip := models.VipRebateOrigin{
 				UserID:    order.UserID,
-				CreatedAt: order.CreatedAt, //TODO how is the field?
+				CreatedAt: order.CreatedAt,
 				OrderID:   order.ID,
 				ItemID:    abcItem.ID,
 				Amount:    abcItem.Price,
 				Balance:   abcItem.Price,
 				User1:     order.User1,
+				//				userVip.NotBefore = now
+				//				userVip.ExpiresAt = nextYearNow
+				//				userVip.Qualified = true
+				//				userVip.User1Used = false
 			}
 
+			// 2. set vip of user
 			var usr models.User
 			if err = db.FindByPrimaryKeyTo(&usr, order.UserID); err != nil {
 				return
 			}
 
-			// 2. set vip of user
-			tnow := time.Now()
-			year, month, day := tnow.Date()
-			begin := time.Date(year, month, day, tnow.Hour(), tnow.Minute(), tnow.Second(), 0, time.Local).Unix()
+			_year, _month, _day := tnow.Date()
+			_hour, _minite, _second := tnow.Hour(), tnow.Minute(), tnow.Second()
+			lastYearNow := time.Date(_year-1, _month, _day, _hour, _minite, _second, 0, time.Local).Unix()
+			nextYearNow := time.Date(_year+1, _month, _day, _hour, _minite, _second, 0, time.Local).Unix()
+
+			var userVips []reform.Struct
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID), goqu.I("$ExpiresAt").Gte(now))
+			userVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
+			if err != nil {
+				return
+			}
+
+			// TODO remove VipAt, NextVipAt
+			// pause here today!
+
 			if usr.VipAt < begin {
 				// expires, use NextVipAt as VipAt
 				usr.VipAt, usr.NextVipAt = usr.NextVipAt, 0
 			}
 			if usr.VipAt < begin {
-				// expires, set vip
-				usr.VipAt = order.CompletedAt
+				// expires, set vips
+				ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID), goqu.I("$CreatedAt").Eq(usr1.VipAt))
+				var user1Vip models.VipRebateOrigin
+				err = db.DsSelectOneTo(&user1Vip, ds)
+				if err != nil {
+					return
+				}
+
+				usr.VipAt = now
+				userVip.NotBefore = now
+				userVip.ExpiresAt = nextYearNow
+				userVip.Qualified = true
+				userVip.User1Used = false
 			} else {
 				// not expires, set next vip
 				usr.NextVipAt = order.CompletedAt
