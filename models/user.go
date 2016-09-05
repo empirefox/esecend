@@ -77,10 +77,9 @@ type VipRebateOrigin struct {
 	Amount    uint  `reform:"amount"`
 	Balance   uint  `reform:"balance"`
 	User1     uint  `reform:"user1"`
-	Qualified bool  `reform:"qualified"`
 	User1Used bool  `reform:"user1_used"`
 }
 
 func (vip *VipRebateOrigin) Valid(now int64) bool {
-	return vip.NotBefore <= now && now <= vip.ExpiresAt
+	return vip.NotBefore <= now && now < vip.ExpiresAt
 }
