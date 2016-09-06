@@ -220,13 +220,13 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		if len(items) == 1 && items[0].IsABC {
 			abcItem = items[0]
 
-			// . get user
+			// 1. get user
 			var usr models.User
 			if err = db.FindByPrimaryKeyTo(&usr, order.UserID); err != nil {
 				return
 			}
 
-			// . get exist vips of user
+			// 2. get exist vips of user
 			var iUserVips []reform.Struct
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID), goqu.I("$ExpiresAt").Gt(now))
 			iUserVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
@@ -234,7 +234,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				return
 			}
 
-			// . find valid/last vip
+			// 3. find valid/last vip
 			var userVips []*models.VipRebateOrigin
 			var userCurrentVip *models.VipRebateOrigin
 			var userLastVip *models.VipRebateOrigin
@@ -249,7 +249,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				}
 			}
 
-			// . save VipRebateOrigin of user
+			// 4. save VipRebateOrigin of user
 			userVip := models.VipRebateOrigin{
 				UserID:    order.UserID,
 				CreatedAt: order.CreatedAt,
@@ -275,7 +275,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				return
 			}
 
-			// . thaw some cash if exsit
+			// 5. thaw some cash if exsit
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID), goqu.I("$ThawedAt").Eq(0))
 			var freeze []reform.Struct
 			freeze, err = db.DsSelectAllFrom(front.UserCashFrozenTable, ds)
@@ -324,149 +324,8 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				}
 			}
 
-			// . trigger rebate for user1
-			if order.User1 != 0 {
-				// .1 find all unused vips from sub users of user1
-				ds = dbs.DS.Where(goqu.I("$User1").Eq(order.User1), goqu.I("$User1Used").IsNotTrue())
-				var user1NextLevelVips []reform.Struct
-				user1NextLevelVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
-				if err != nil {
-					return
-				}
-
-				// .2 find valid vip of user1
-				ds = dbs.DS.Where(
-					goqu.I("$UserID").Eq(order.User1),
-					goqu.I("$NotBefore").Lte(now),
-					goqu.I("$ExpiresAt").Gt(now),
-				)
-				var user1Vip models.VipRebateOrigin
-				err = db.DsSelectOneTo(&user1Vip, ds)
-				if err != nil {
-					return
-				}
-
-				// TODO if user1 is vip do stage rebate or directly reward
-				// if not, freeze reward
-				// pause here today!
-
-				if usr1.VipAt < begin {
-					// not vip
-					usr1.VipAt = 0
-					if usr1WasVip {
-						// 4.1 rebate counter to user1 cash if user1 is not vip but was right now
-						// we DO NOT record order_id
-						lUser1NextLevelVips := len(user1NextLevelVips)
-						if lUser1NextLevelVips > 1 {
-							log.Errorln("lUser1NextLevelVips err:", lUser1NextLevelVips)
-						}
-						for _, ivip := range user1NextLevelVips {
-							usr1CashBalance += int(dbs.config.Money.RewardFromVipCent)
-							err = db.Insert(&front.UserCash{
-								UserID:    order.User1,
-								CreatedAt: now,
-								Type:      front.TUserCashReward,
-								Amount:    int(dbs.config.Money.RewardFromVipCent),
-								Balance:   usr1CashBalance,
-								OrderID:   ivip.(*models.VipRebateOrigin).OrderID,
-							})
-							if err != nil {
-								return
-							}
-						}
-						_, err = db.DsUpdateColumns(&models.VipRebateOrigin{User1Used: true}, ds, "User1Used")
-						if err != nil {
-							return
-						}
-					}
-					// 4.2 freeze reward to user1, set user vip to used
-					err = db.Insert(&front.UserCashFrozen{
-						UserID:    order.User1,
-						OrderID:   order.ID,
-						CreatedAt: now,
-						Type:      front.TUserCashReward,
-						Amount:    int(dbs.config.Money.RewardFromVipCent),
-						Stages:    0,
-						ThawedAt:  0,
-					})
-					if err != nil {
-						return
-					}
-					userVip.User1Used = true
-				} else {
-					// 4.3 user1 is vip, so we can check if needing rebate or reward
-					// There must be a vip, so get current VipRebateOrigin
-					ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.User1), goqu.I("$CreatedAt").Eq(usr1.VipAt))
-					var user1Vip models.VipRebateOrigin
-					err = db.DsSelectOneTo(&user1Vip, ds)
-					if err != nil {
-						return
-					}
-
-					if user1Vip.Balance == 0 {
-						// 4.4 reward to user1, set user vip to used
-						usr1CashBalance += int(dbs.config.Money.RewardFromVipCent)
-						err = db.Insert(&front.UserCash{
-							UserID:    order.User1,
-							CreatedAt: now,
-							Type:      front.TUserCashReward,
-							Amount:    int(dbs.config.Money.RewardFromVipCent),
-							Balance:   usr1CashBalance,
-							OrderID:   order.ID,
-						})
-						if err != nil {
-							return
-						}
-						userVip.User1Used = true
-					} else {
-						// 4.5 rebate to user1, the next vip must be the current of the next user.
-						// If not also do reward.
-
-						// 4.5.1 split vips to [userCurrent, userNext].
-						// TODO add expires?
-
-						// 4.5.2 discard userNext?
-						lUser1NextLevelVips++
-						if lUser1NextLevelVips >= 2 {
-							lUser1NextLevelVips -= 2
-							// 4.5.1 find 2vips of the same amount with user
-							var sames []*models.VipRebateOrigin
-							var nextVipsAllAmount uint
-							var lowest uint
-							var highest uint
-							// TODO add userVip to user1NextLevelVips without ID set
-							for _, ivip := range user1NextLevelVips {
-								amount := ivip.(*models.VipRebateOrigin).Amount
-								nextVipsAllAmount += amount
-								if amount == user1Vip.Amount {
-									sames = append(sames, ivip.(*models.VipRebateOrigin))
-								}
-								if amount < lowest || lowest == 0 {
-									lowest = amount
-								}
-								if amount > highest || highest == 0 {
-									highest = amount
-								}
-							}
-							// TODO compute which next vips to use?
-							if len(sames) >= 2 {
-								_, err = db.DsUpdateColumns(&models.VipRebateOrigin{User1Used: true}, ds, "User1Used")
-							}
-
-							if user1Vip.Balance == user1Vip.Amount {
-								toRebate := user1Vip.Amount / 2
-								user1Vip.Balance = user1Vip.Amount - toRebate
-							}
-						}
-					}
-
-				}
-
-			}
-
-			if err = db.Insert(&userVip); err != nil {
-				return
-			}
+			// 6. move rebate of user1 to frontend.
+			// backend just accepts the choice of user1
 		}
 
 		if order.User1 != 0 {
