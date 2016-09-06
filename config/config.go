@@ -32,7 +32,7 @@ type Money struct {
 	StoreSaleFeePercent     uint
 	User1RebatePercent      uint
 	Store1RebatePercent     uint
-	UserCashUnfrozenStages  uint
+	UserCashRebateStages    uint
 	RewardFromVipCent       uint
 	RewardFromVipRebateDone uint
 }

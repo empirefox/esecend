@@ -290,34 +290,22 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 
 				for _, itemi := range freeze {
 					item := itemi.(*front.UserCashFrozen)
-					if item.Stages == 0 {
-						var top front.UserCash
-						ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID)).Order(goqu.I("$CreatedAt").Desc())
-						if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
-							return
-						}
-
-						err = db.Insert(&front.UserCash{
-							UserID:    order.UserID,
-							CreatedAt: now,
-							Type:      item.Type,
-							Amount:    int(item.Amount),
-							Balance:   top.Balance + int(item.Amount),
-							OrderID:   item.OrderID,
-							Remark:    item.Remark,
-						})
-					} else {
-						err = db.Insert(&front.UserCashRebate{
-							UserID:    order.UserID,
-							OrderID:   item.OrderID,
-							CreatedAt: now,
-							Type:      item.Type,
-							Amount:    item.Amount,
-							Remark:    item.Remark,
-							Stages:    item.Stages,
-							DoneAt:    0,
-						})
+					var top front.UserCash
+					ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID)).Order(goqu.I("$CreatedAt").Desc())
+					if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
+						return
 					}
+
+					// to rebate cash? impossible!
+					err = db.Insert(&front.UserCash{
+						UserID:    order.UserID,
+						CreatedAt: now,
+						Type:      item.Type,
+						Amount:    int(item.Amount),
+						Balance:   top.Balance + int(item.Amount),
+						OrderID:   item.OrderID,
+						Remark:    item.Remark,
+					})
 					if err != nil {
 						return
 					}

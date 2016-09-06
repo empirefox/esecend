@@ -81,4 +81,11 @@ const (
 	ApiImplementFailed
 	WxUserAbnormal
 	ParseWxTotalFeeFailed
+
+	VipRebateSubIDsLen
+	VipRebateSubIDsHas0
+	VipRebateSubIDsNoRow
+	NotVip
+	VipBalanceEmpty
+	VipRebateSubTotalSmall
 )
