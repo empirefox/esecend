@@ -235,11 +235,11 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 			}
 
 			// 3. find valid/last vip
-			var userVips []*models.VipRebateOrigin
-			var userCurrentVip *models.VipRebateOrigin
-			var userLastVip *models.VipRebateOrigin
+			var userVips []*front.VipRebateOrigin
+			var userCurrentVip *front.VipRebateOrigin
+			var userLastVip *front.VipRebateOrigin
 			for _, ivip := range iUserVips {
-				vip := ivip.(*models.VipRebateOrigin)
+				vip := ivip.(*front.VipRebateOrigin)
 				userVips = append(userVips, vip)
 				if vip.Valid(now) {
 					userCurrentVip = vip
@@ -250,7 +250,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 			}
 
 			// 4. save VipRebateOrigin of user
-			userVip := models.VipRebateOrigin{
+			userVip := front.VipRebateOrigin{
 				UserID:    order.UserID,
 				CreatedAt: order.CreatedAt,
 				OrderID:   order.ID,
