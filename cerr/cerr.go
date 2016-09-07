@@ -89,4 +89,5 @@ const (
 	VipBalanceEmpty
 	VipRebateSubTotalSmall
 	InvalidRebateType
+	AmountLimit
 )

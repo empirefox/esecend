@@ -11,6 +11,7 @@ const (
 	TUserCashPrepayBack
 	TUserCashTrade
 	TUserCashRefund
+	TUserCashPreWithdraw
 	TUserCashWithdraw
 	TUserCashReward
 	TUserCashRebate
@@ -88,4 +89,9 @@ type WxPayArgs struct {
 	Package   string `json:"package"`
 	SignType  string `json:"signType"`
 	PaySign   string `json:"paySign"`
+}
+
+type WithdrawPayload struct {
+	Amount uint
+	Ip     string `json:"-"`
 }

@@ -35,6 +35,7 @@ type Money struct {
 	UserCashRebateStages    uint
 	RewardFromVipCent       uint
 	RewardFromVipRebateDone uint
+	WithdrawDesc            string
 }
 
 type Weixin struct {

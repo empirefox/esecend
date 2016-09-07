@@ -316,7 +316,7 @@ func (wc *WxClient) Transfers(args *TransfersArgs) (map[string]string, error) {
 		"partner_trade_no": args.TradeNo,
 		"openid":           args.OpenID,
 		"check_name":       "NO_CHECK",
-		"amount":           args.Amount,
+		"amount":           strconv.FormatUint(args.Amount, 10),
 		"desc":             args.Desc,
 		"spbill_create_ip": args.Ip,
 	}
