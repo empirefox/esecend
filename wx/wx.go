@@ -115,13 +115,10 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 	defer lok.OrderLok.Unlock(id)
 
 	var userId uint
-	var cashLocked, pointsLocked bool
+	var cashLocked bool
 	defer func() {
 		if cashLocked {
 			lok.CashLok.Unlock(userId)
-		}
-		if pointsLocked {
-			lok.PointsLok.Unlock(userId)
 		}
 	}()
 
@@ -130,7 +127,7 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 		if err != nil {
 			return err
 		}
-		userId, cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, m, nil)
+		userId, cashLocked, err = wc.updateWxOrderSate(dbs, order, m, nil)
 		return err
 	})
 
@@ -144,7 +141,7 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 
 func (wc *WxClient) updateWxOrderSate(
 	dbs *dbsrv.DbService, order *front.Order, src map[string]string, tokUsr *models.User,
-) (userId uint, cashLocked, pointsLocked bool, err error) {
+) (userId uint, cashLocked bool, err error) {
 
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
@@ -251,14 +248,14 @@ func (wc *WxClient) updateWxOrderSate(
 	return
 }
 
-func (wc *WxClient) UpdateWxOrderSate(tokUsr *models.User, dbs *dbsrv.DbService, order *front.Order) (cashLocked, pointsLocked bool, err error) {
+func (wc *WxClient) UpdateWxOrderSate(tokUsr *models.User, dbs *dbsrv.DbService, order *front.Order) (cashLocked bool, err error) {
 	var res map[string]string
 	res, err = wc.OrderQuery(order)
 	if err != nil {
 		return
 	}
 
-	_, cashLocked, pointsLocked, err = wc.updateWxOrderSate(dbs, order, res, tokUsr)
+	_, cashLocked, err = wc.updateWxOrderSate(dbs, order, res, tokUsr)
 	return
 }
 
