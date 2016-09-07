@@ -300,6 +300,30 @@ func (wc *WxClient) OrderRefund(order *front.Order, opUserId string) (map[string
 	return pay.Refund(wc.Client, req)
 }
 
+type TransfersArgs struct {
+	TradeNo string
+	OpenID  string
+	Amount  uint
+	Desc    string
+	Ip      string
+}
+
+func (wc *WxClient) Transfers(args *TransfersArgs) (map[string]string, error) {
+	req := map[string]string{
+		"mch_appid":        wc.wx.AppId,
+		"mchid":            wc.wx.MchId,
+		"nonce_str":        uniuri.NewLen(32),
+		"partner_trade_no": args.TradeNo,
+		"openid":           args.OpenID,
+		"check_name":       "NO_CHECK",
+		"amount":           args.Amount,
+		"desc":             args.Desc,
+		"spbill_create_ip": args.Ip,
+	}
+	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
+	return promotion.Transfers(wc.Client, req)
+}
+
 type WxResponse struct {
 	XMLName    xml.Name  `xml:"xml"`
 	ReturnCode CDATAText `xml:"return_code"`

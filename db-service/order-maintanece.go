@@ -204,12 +204,12 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		}
 
 		err = db.Insert(&models.PlatformCash{
-			CreatedAt: now,
-			Type:      front.TUserCashTrade,
-			Total:     order.PayAmount,
-			OrderID:   order.ID,
-			Amount:    toPlatform,
-			Balance:   top.Balance + toPlatform,
+			CreatedAt:  now,
+			Type:       front.TUserCashTrade,
+			OrderTotal: order.PayAmount,
+			OrderID:    order.ID,
+			Amount:     toPlatform,
+			Balance:    top.Balance + toPlatform,
 		})
 		if err != nil {
 			return
