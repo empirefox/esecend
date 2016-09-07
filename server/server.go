@@ -9,6 +9,7 @@ import (
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/esecend/hub"
 	"github.com/empirefox/esecend/search"
 	"github.com/empirefox/esecend/sec"
 	"github.com/empirefox/esecend/sms"
@@ -28,6 +29,7 @@ type Server struct {
 	SmsSender  sms.Sender
 	DB         *dbsrv.DbService
 	Captcha    captchar.Captchar
+	ProductHub *hub.ProductHub
 
 	ProductResource *search.Resource
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/chanxuehong/util"
 	"github.com/chanxuehong/wechat.v2/mch/core"
 	"github.com/chanxuehong/wechat.v2/mch/pay"
+	"github.com/chanxuehong/wechat/mch/mmpaymkttransfers/promotion"
 	"github.com/dchest/uniuri"
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/config"

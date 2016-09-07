@@ -17,7 +17,7 @@ func (s *Server) PostCheckout(c *gin.Context) {
 		return
 	}
 
-	data, err := s.DB.CheckoutOrder(s.TokenUser(c), &payload)
+	data, err := s.ProductHub.CheckoutOrder(s.TokenUser(c), &payload)
 	if Abort(c, err) {
 		return
 	}
