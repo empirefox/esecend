@@ -88,4 +88,5 @@ const (
 	NotVip
 	VipBalanceEmpty
 	VipRebateSubTotalSmall
+	InvalidRebateType
 )

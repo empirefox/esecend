@@ -100,10 +100,10 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		// 2. store
 		var toStoreAll uint
 		for id, to := range toStoreMap {
-			ds := dbs.DS.Where(goqu.I(front.StoreTable.PK()).Eq(id))
-			count, err1 := db.DsCount(front.StoreTable, ds)
-			if err1 != nil {
-				err = err1
+			ds := dbs.DS.Where(goqu.I(front.StoreTable.PK()).Eq(id)).Limit(1)
+			var count uint64
+			count, err = db.DsCount(front.StoreTable, ds)
+			if err != nil {
 				return
 			}
 			if count != 0 {
@@ -132,10 +132,10 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		// 3. store1
 		var toStore1All uint
 		for id, to := range toStoreMap {
-			ds := dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(id))
-			count, err1 := db.DsCount(models.UserTable, ds)
-			if err1 != nil {
-				err = err1
+			ds := dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(id)).Limit(1)
+			var count uint64
+			count, err = db.DsCount(models.UserTable, ds)
+			if err != nil {
 				return
 			}
 			if count != 0 {
@@ -163,15 +163,17 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		}
 
 		// 4. user1
-		var usr1 models.User
 		var usr1CashBalance int
 		total := order.PayAmount - order.DeliverFee
 		toUsr1 := total * dbs.config.Money.User1RebatePercent / 100
 		if order.User1 != 0 {
-			//			ds := dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(order.User1))
-			//			count, err1 := db.DsCount(models.UserTable, ds)
-			err = db.FindByPrimaryKeyTo(&usr1, order.User1)
-			if err == nil {
+			ds := dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(order.User1))
+			var count uint64
+			count, err = db.DsCount(models.UserTable, ds)
+			if err != nil {
+				return
+			}
+			if count == 1 {
 				var top front.UserCash
 				ds := dbs.DS.Where(goqu.I("$UserID").Eq(order.User1)).Order(goqu.I("$CreatedAt").Desc())
 				if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
@@ -190,8 +192,6 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 				if err != nil {
 					return
 				}
-			} else if err != reform.ErrNoRows {
-				return
 			}
 		}
 
@@ -314,12 +314,6 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 
 			// 6. move rebate of user1 to frontend.
 			// backend just accepts the choice of user1
-		}
-
-		if order.User1 != 0 {
-			if err = db.Save(&usr1); err != nil {
-				return
-			}
 		}
 	}
 

@@ -109,6 +109,34 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			return err
 		}
 
+		// trigger 200 to user1 of user
+		if vip.Balance == 0 && vip.User1 != 0 {
+			ds = dbs.DS.Where(goqu.I(models.UserTable.PK()).Eq(vip.User1))
+			count, err := db.DsCount(models.UserTable, ds)
+			if err != nil {
+				return err
+			}
+			if count == 1 {
+				var top front.UserCash
+				ds = dbs.DS.Where(goqu.I("$UserID").Eq(vip.User1)).Order(goqu.I("$CreatedAt").Desc())
+				if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
+					return
+				}
+
+				err = db.Insert(&front.UserCash{
+					UserID:    vip.User1,
+					OrderID:   vip.OrderID,
+					CreatedAt: now,
+					Type:      front.TUserCashReward,
+					Amount:    int(dbs.config.Money.RewardFromVipRebateDone),
+					Balance:   top.Balance + int(dbs.config.Money.RewardFromVipRebateDone),
+				})
+				if err != nil {
+					return
+				}
+			}
+		}
+
 	case "reward":
 		// sub vips
 		if len(payload.SubIDs) == 0 {
@@ -136,7 +164,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 		}
 
 		// use qualifications
-		ds := dbs.DS.Where(goqu.I(front.VipRebateOriginTable.PK()).In(ids...))
+		ds = dbs.DS.Where(goqu.I(front.VipRebateOriginTable.PK()).In(ids...))
 		_, err = db.DsUpdateColumns(&front.VipRebateOrigin{User1Used: true}, ds, "User1Used")
 		if err != nil {
 			return err
@@ -144,23 +172,23 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 
 		if vip.ID == 0 {
 			// reward in time
-			var usr1CashBalance int
 			var top front.UserCash
-			ds := dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 			if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
 				return
 			}
 
+			usr1CashBalance := top.Balance
 			for _, ivip := range ivips {
 				vip := ivip.(*front.VipRebateOrigin)
-				// TODO pause here
+				usr1CashBalance += int(dbs.config.Money.RewardFromVipCent)
 				err = db.Insert(&front.UserCash{
-					UserID:    order.User1,
+					UserID:    tokUsr.ID,
+					OrderID:   vip.OrderID,
 					CreatedAt: now,
-					Type:      front.TUserCashRebate,
-					Amount:    int(toUsr1),
+					Type:      front.TUserCashReward,
+					Amount:    int(dbs.config.Money.RewardFromVipCent),
 					Balance:   usr1CashBalance,
-					OrderID:   order.ID,
 				})
 				if err != nil {
 					return
@@ -168,7 +196,30 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			}
 		} else {
 			// freeze reward
+			var top front.UserCashFrozen
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
+			if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
+				return
+			}
+
+			usrCashBalance := top.Balance
+			for _, ivip := range ivips {
+				vip := ivip.(*front.VipRebateOrigin)
+				usrCashBalance += int(dbs.config.Money.RewardFromVipCent)
+				err = db.Insert(&front.UserCashFrozen{
+					UserID:    tokUsr.ID,
+					OrderID:   vip.OrderID,
+					CreatedAt: now,
+					Type:      front.TUserCashRebate,
+					Amount:    int(dbs.config.Money.RewardFromVipCent),
+				})
+				if err != nil {
+					return
+				}
+			}
 		}
 	default:
+		return cerr.InvalidRebateType
 	}
+	return nil
 }
