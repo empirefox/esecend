@@ -32,7 +32,7 @@ func (dbs *DbService) GetOrderItems(o *front.Order) ([]*front.OrderItem, error) 
 	return o.Items, nil
 }
 
-// TODO separate ABC
+// TODO separate ABC and points_pay_only
 func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (*front.Order, error) {
 	// prepare skuIds, groupbuyIds to query
 	var skuIds []interface{}
@@ -283,6 +283,12 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 		return
 	}
 
+	// exclude points pay
+	if order.PayPoints != 0 {
+		err = cerr.InvalidPayType
+		return
+	}
+
 	// prepay after prepaid
 	if order.State == front.TOrderStatePrepaid {
 		durPrepaid := time.Now().Unix() - order.PrepaidAt
@@ -343,12 +349,7 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 }
 
 // no wx pay, need paykey
-func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload *front.OrderPayPayload) (err error) {
-	if payload.Amount == 0 {
-		err = cerr.InvalidPayAmount
-		return
-	}
-
+func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPayload) (o *front.Order, err error) {
 	db := dbs.GetDB()
 
 	if err = db.Reload(tokUsr); err != nil {
@@ -365,7 +366,8 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		return
 	}
 
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	var order front.Order
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID), goqu.I("$UserID").Eq(tokUsr.ID))
 	if err = db.DsSelectOneTo(order, ds); err != nil {
 		return
 	}
@@ -373,42 +375,85 @@ func (dbs *DbService) PayOrder(order *front.Order, tokUsr *models.User, payload 
 		err = cerr.NoWayToPaidState
 		return
 	}
-	if order.PayAmount != payload.Amount {
-		err = cerr.InvalidPayAmount
-		return
-	}
 
 	now := time.Now().Unix()
 
-	var flow front.UserCash
-	ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
-	if err = db.DsSelectOneTo(&flow, ds); err != nil {
-		glog.Errorln(err)
-		return
+	if payload.IsPoints && order.PayPoints != 0 {
+		if order.PayPoints != payload.Amount {
+			err = cerr.InvalidPayAmount
+			return
+		}
+
+		var top front.PointsItem
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
+		if err = db.DsSelectOneTo(&top, ds); err != nil {
+			glog.Errorln(err)
+			return
+		}
+
+		if top.Balance < int(payload.Amount) {
+			err = cerr.NotEnoughPoints
+			return
+		}
+
+		err = db.Save(&front.PointsItem{
+			UserID:    tokUsr.ID,
+			CreatedAt: now,
+			Amount:    -int(payload.Amount),
+			Balance:   top.Balance - int(payload.Amount),
+			OrderID:   order.ID,
+		})
+		if err != nil {
+			glog.Errorln(err)
+			return
+		}
+
+		order.PointsPaid = payload.Amount
+		order.State = front.TOrderStatePaid
+		order.PaidAt = now
+		err = db.UpdateColumns(order, "PointsPaid", "State", "PaidAt")
+	} else if !payload.IsPoints && order.PayPoints == 0 {
+		if order.PayAmount != payload.Amount {
+			err = cerr.InvalidPayAmount
+			return
+		}
+
+		var top front.UserCash
+		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
+		if err = db.DsSelectOneTo(&top, ds); err != nil {
+			glog.Errorln(err)
+			return
+		}
+
+		if top.Balance < int(payload.Amount) {
+			err = cerr.NotEnoughMoney
+			return
+		}
+
+		err = db.Save(&front.UserCash{
+			UserID:    tokUsr.ID,
+			CreatedAt: now,
+			Type:      front.TUserCashTrade, // Trade type
+			Amount:    -int(payload.Amount),
+			Balance:   top.Balance - int(payload.Amount),
+			OrderID:   order.ID,
+		})
+		if err != nil {
+			glog.Errorln(err)
+			return
+		}
+
+		order.CashPaid = payload.Amount
+		order.State = front.TOrderStatePaid
+		order.PaidAt = now
+		err = db.UpdateColumns(order, "CashPaid", "State", "PaidAt")
+	} else {
+		err = cerr.InvalidPayType
 	}
 
-	if flow.Balance < int(payload.Amount) {
-		err = cerr.NotEnoughMoney
-		return
-	}
-
-	err = db.Save(&front.UserCash{
-		UserID:    tokUsr.ID,
-		CreatedAt: now,
-		Type:      front.TUserCashTrade, // Trade type
-		Amount:    -int(payload.Amount),
-		Balance:   flow.Balance - int(payload.Amount),
-		OrderID:   order.ID,
-	})
 	if err != nil {
-		glog.Errorln(err)
-		return
+		o = &order
 	}
-
-	order.CashPaid = payload.Amount
-	order.State = front.TOrderStatePaid
-	order.PaidAt = now
-	err = db.UpdateColumns(order, "CashPaid", "State", "PaidAt")
 	return
 }
 

@@ -35,7 +35,7 @@ func (hub *OrderHub) onPrepayOrder(tx *dbsrv.DbService, in *prepayOrderInput) {
 	var order *front.Order
 	var prepaid bool
 	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
-		order, prepaid, err = tx.PrepayOrder(in.PrepayOrderInput)
+		order, prepaid, err = tx.PrepayOrder(in.userId, in.orderId)
 	})
 	if err != nil {
 		in.chanErr <- err

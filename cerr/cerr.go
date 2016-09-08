@@ -55,6 +55,7 @@ const (
 	NotEnoughMoney
 	NotEnoughPoints
 	InvalidPayAmount
+	InvalidPayType
 	NotNopayState
 	NoWayToPaidState
 	NoWayToTargetState

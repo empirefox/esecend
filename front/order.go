@@ -36,15 +36,6 @@ const (
 	TOrderStateHistory
 )
 
-type PayType int
-
-const (
-	TPayTypeUnknown PayType = iota
-	TPayTypeWeixin
-	TPayTypeCash
-	TPayTypePoints
-)
-
 //reform:cc_order_item
 type OrderItem struct {
 	ID         uint   `reform:"id,pk"`
@@ -56,6 +47,7 @@ type OrderItem struct {
 	IsABC      bool   `reform:"is_abc"`
 	Quantity   uint   `reform:"product_count"`
 	Price      uint   `reform:"product_price"`
+	Points     uint   `reform:"points"` // override price
 	CreatedAt  int64  `reform:"created_time"`
 	Name       string `reform:"name"`
 	Img        string `reform:"img"`
@@ -76,17 +68,17 @@ type OrderItem struct {
 
 //reform:cc_order
 type Order struct {
-	ID              uint    `reform:"id,pk"`
-	PayAmount       uint    `reform:"pay_amount"`
-	PayType         PayType `reform:"pay_type"`
-	WxPaid          uint    `reform:"wx_paid"`
-	WxRefund        uint    `reform:"wx_refund"`
-	CashPaid        uint    `reform:"cash_paid"`
-	CashRefund      uint    `reform:"cash_refund"`
-	PointsPaid      uint    `reform:"points_paid"`
-	AbandonedReason string  `reform:"abandoned_reason"`
-	Remark          string  `reform:"remark"`
-	UserID          uint    `reform:"user_id" json:"-"` // check owner only
+	ID              uint   `reform:"id,pk"`
+	PayAmount       uint   `reform:"pay_amount"`
+	WxPaid          uint   `reform:"wx_paid"`
+	WxRefund        uint   `reform:"wx_refund"`
+	CashPaid        uint   `reform:"cash_paid"`
+	CashRefund      uint   `reform:"cash_refund"`
+	PayPoints       uint   `reform:"pay_points"` // override other pay types
+	PointsPaid      uint   `reform:"points_paid"`
+	AbandonedReason string `reform:"abandoned_reason"`
+	Remark          string `reform:"remark"`
+	UserID          uint   `reform:"user_id" json:"-"` // check owner only
 	Items           []*OrderItem
 
 	IsDeliverPay bool   `reform:"is_deliver_pay"`
@@ -120,8 +112,6 @@ type Order struct {
 
 	Rebated bool `reform:"rebated" json:"-"`
 	User1   uint `reform:"user1"   json:"-"`
-
-	PointsPayOnly bool `reform:"points_pay_only"`
 
 	// weixin
 	WxPrepayID      string     `reform:"wx_prepay_id"      json:"-"`
@@ -190,7 +180,8 @@ type OrderPrepayResponse struct {
 }
 
 type OrderPayPayload struct {
-	Key     string
-	OrderID uint
-	Amount  uint
+	Key      string
+	OrderID  uint
+	Amount   uint
+	IsPoints bool
 }

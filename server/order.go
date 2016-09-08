@@ -60,13 +60,17 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 	if err := c.BindJSON(&payload); Abort(c, err) {
 		return
 	}
+	if payload.Amount == 0 {
+		front.NewCodev(cerr.InvalidPayAmount).Abort(c, http.StatusBadRequest)
+		return
+	}
+	if payload.Key == "" || payload.OrderID == 0 {
+		front.NewCodev(cerr.InvalidPostBody).Abort(c, http.StatusBadRequest)
+		return
+	}
 
 	tokUsr := s.TokenUser(c)
-
-	var order front.Order
-	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		return tx.PayOrder(&order, tokUsr, &payload)
-	})
+	order, err := s.OrderHub.PayOrder(tokUsr, &payload)
 	if Abort(c, err) {
 		return
 	}
