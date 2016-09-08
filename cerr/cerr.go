@@ -61,11 +61,8 @@ const (
 	NoPermToState
 	OrderClosed
 	OrderCloseNeeded
-	OrderTmpLocked
 	OrderCompleteTimeout
 	OrderEvalTimeout
-	CashTmpLocked
-	PointsTmpLocked
 	OrderItemNotFound
 	NotPrepayOrder
 	WxPayNotCompleted
@@ -76,7 +73,6 @@ const (
 	WxOrderAlreadyPaid
 	WxSystemFailed
 	InvalidCashPrepaid
-	InvalidPointsPrepaid
 	InvalidPrepayPayload
 	ApiImplementFailed
 	WxUserAbnormal

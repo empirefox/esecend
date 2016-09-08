@@ -1,7 +1,11 @@
 //go:generate reform
 package models
 
-import "github.com/empirefox/esecend/front"
+import (
+	"fmt"
+
+	"github.com/empirefox/esecend/front"
+)
 
 //reform:cc_platform_cash
 type PlatformCash struct {

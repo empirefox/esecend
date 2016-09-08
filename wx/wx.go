@@ -10,20 +10,14 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/doug-martin/goqu.v3"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/chanxuehong/util"
 	"github.com/chanxuehong/wechat.v2/mch/core"
+	"github.com/chanxuehong/wechat.v2/mch/mmpaymkttransfers/promotion"
 	"github.com/chanxuehong/wechat.v2/mch/pay"
-	"github.com/chanxuehong/wechat/mch/mmpaymkttransfers/promotion"
 	"github.com/dchest/uniuri"
-	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/config"
-	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
-	"github.com/empirefox/esecend/l"
-	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
 )
 
@@ -33,10 +27,9 @@ type WxClient struct {
 	*core.Client
 	notifyUrl string
 	wx        *config.Weixin
-	dbs       *dbsrv.DbService
 }
 
-func NewWxClient(config *config.Config, dbs *dbsrv.DbService) (*WxClient, error) {
+func NewWxClient(config *config.Config) (*WxClient, error) {
 	weixin := &config.Weixin
 	httpClient, err := core.NewTLSHttpClient(weixin.CertFile, weixin.KeyFile)
 	if err != nil {
@@ -46,7 +39,6 @@ func NewWxClient(config *config.Config, dbs *dbsrv.DbService) (*WxClient, error)
 		wx:        weixin,
 		notifyUrl: config.Security.SecendOrigin + config.Security.PayNotifyPath,
 		Client:    core.NewClient(weixin.AppId, weixin.MchId, weixin.ApiKey, httpClient),
-		dbs:       dbs,
 	}, nil
 }
 
@@ -83,25 +75,25 @@ func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip str
 	return args, nil
 }
 
-func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
+func (wc *WxClient) OnWxPayNotify(r io.Reader) (*WxResponse, map[string]string) {
 	m, err := util.DecodeXMLToMap(r)
 	if err != nil {
-		return NewWxResponse("FAIL", "failed to parse request body")
+		return NewWxResponse("FAIL", "failed to parse request body"), nil
 	}
 	if m["return_code"] != "SUCCESS" {
-		return NewWxResponse(m["return_code"], m["return_msg"])
+		return NewWxResponse(m["return_code"], m["return_msg"]), nil
 	}
 
 	sign := core.Sign(m, wc.wx.ApiKey, md5.New)
 	if sign != m["sign"] {
-		return NewWxResponse("FAIL", "failed to validate md5")
+		return NewWxResponse("FAIL", "failed to validate md5"), nil
 	}
 
 	var at int64
 	var id uint
 	_, err = fmt.Sscanf(m["out_trade_no"], "%d-%d", &at, &id)
 	if err != nil {
-		return NewWxResponse("FAIL", "failed to parse out_trade_no")
+		return NewWxResponse("FAIL", "failed to parse out_trade_no"), nil
 	}
 
 	if m["result_code"] == "SUCCESS" {
@@ -110,154 +102,7 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) interface{} {
 		m["trade_state"] = "NOPAY"
 	}
 
-	if !lok.OrderLok.Lock(id) {
-		return NewWxResponse("FAIL", "order is locked temporally")
-	}
-	defer lok.OrderLok.Unlock(id)
-
-	var userId uint
-	var cashLocked bool
-	defer func() {
-		if cashLocked {
-			lok.CashLok.Unlock(userId)
-		}
-	}()
-
-	err = wc.dbs.InTx(func(dbs *dbsrv.DbService) error {
-		order, err := dbs.GetBareOrder(nil, id)
-		if err != nil {
-			return err
-		}
-		userId, cashLocked, err = wc.updateWxOrderSate(dbs, order, m, nil)
-		return err
-	})
-
-	// must trans to WxReponse
-	if err != nil {
-		return NewWxResponse("FAIL", "failed to update trade state")
-	}
-
-	return NewWxResponse("SUCCESS", "")
-}
-
-func (wc *WxClient) updateWxOrderSate(
-	dbs *dbsrv.DbService, order *front.Order, src map[string]string, tokUsr *models.User,
-) (userId uint, cashLocked bool, err error) {
-
-	tradeState := front.TradeStateNameToValue[src["trade_state"]]
-	tid := src["transaction_id"]
-	if order.TradeState == tradeState && order.TransactionId == tid {
-		// no need update
-		return
-	}
-
-	totalFee64, _ := strconv.ParseUint(src["total_fee"], 10, 64)
-	if totalFee64 == 0 {
-		err = cerr.ParseWxTotalFeeFailed
-		return
-	}
-
-	var attach models.UnifiedOrderAttach
-	attachB64, hasAttach := src["attach"]
-	if hasAttach {
-		var attachBs []byte
-		attachBs, err = base64.URLEncoding.DecodeString(attachB64)
-		if err != nil {
-			return
-		}
-
-		err = json.Unmarshal(attachBs, &attach)
-		if err != nil {
-			return
-		}
-
-		if attach.CashPaid != order.CashPaid || attach.PointsPaid != order.PointsPaid {
-			err = cerr.InvalidPayAmount
-			return
-		}
-		if attach.UserID != tokUsr.ID {
-			err = cerr.InvalidUserID
-			return
-		}
-		userId = attach.UserID
-	}
-
-	switch tradeState {
-	case front.SUCCESS:
-		if err = dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
-			log.WithFields(l.Locate(logrus.Fields{
-				"OrderID": order.ID,
-				"State":   order.State,
-			})).Info("Got wxpay with SUCCESS")
-			return
-		}
-		if hasAttach && order.State == front.TOrderStatePrepaid {
-			now := time.Now().Unix()
-			if attach.PreCashID != 0 {
-				if cashLocked = lok.CashLok.Lock(attach.UserID); !cashLocked {
-					err = cerr.CashTmpLocked
-					return
-				}
-
-				ds := dbs.DS.Where(goqu.I(front.UserCashTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-				_, err = dbs.GetDB().DsUpdateColumns(&front.UserCash{
-					Type:      front.TUserCashTrade,
-					CreatedAt: now,
-				}, ds, "Type", "CreatedAt")
-				if err != nil {
-					return
-				}
-			}
-		}
-
-		timeEnd, errTime := time.Parse("20060102150405", src["time_end"])
-		if errTime != nil {
-			timeEnd = time.Now()
-		}
-
-		data := front.Order{
-			ID:            order.ID,
-			WxPaid:        uint(totalFee64),
-			TransactionId: tid,
-			TradeState:    tradeState,
-			State:         front.TOrderStatePaid,
-			PaidAt:        timeEnd.Unix(),
-		}
-		err = dbs.GetDB().UpdateColumns(&data, "WxPaid", "TransactionId", "TradeState", "State", "PaidAt")
-		if err != nil {
-			return
-		}
-		order.WxPaid = data.WxPaid
-		order.TransactionId = data.TransactionId
-		order.TradeState = data.TradeState
-		order.State = data.State
-		order.PaidAt = data.PaidAt
-
-	case front.REFUND, front.USERPAYING, front.PAYERROR:
-		err = dbs.GetDB().UpdateColumns(&front.Order{ID: order.ID, TradeState: tradeState}, "TradeState")
-		if err == nil {
-			order.TradeState = tradeState
-		}
-
-	case front.CLOSED:
-		// must be an expired order, ignore
-		// refound must be called with SUCCESS on closeorder
-		// web must refresh!
-		err = cerr.OrderClosed
-	}
-
-	return
-}
-
-func (wc *WxClient) UpdateWxOrderSate(tokUsr *models.User, dbs *dbsrv.DbService, order *front.Order) (cashLocked bool, err error) {
-	var res map[string]string
-	res, err = wc.OrderQuery(order)
-	if err != nil {
-		return
-	}
-
-	_, cashLocked, err = wc.updateWxOrderSate(dbs, order, res, tokUsr)
-	return
+	return nil, m
 }
 
 func (wc *WxClient) OrderQuery(order *front.Order) (map[string]string, error) {
@@ -317,7 +162,7 @@ func (wc *WxClient) Transfers(args *TransfersArgs) (map[string]string, error) {
 		"partner_trade_no": args.TradeNo,
 		"openid":           args.OpenID,
 		"check_name":       "NO_CHECK",
-		"amount":           strconv.FormatUint(args.Amount, 10),
+		"amount":           strconv.FormatUint(uint64(args.Amount), 10),
 		"desc":             args.Desc,
 		"spbill_create_ip": args.Ip,
 	}

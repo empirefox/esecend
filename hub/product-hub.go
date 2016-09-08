@@ -11,8 +11,9 @@ type ProductHub struct {
 	checkout chan *checkoutInput
 }
 
-func NewProductHub() *ProductHub {
+func NewProductHub(dbs *dbsrv.DbService) *ProductHub {
 	return &ProductHub{
+		dbs:      dbs,
 		checkout: make(chan *checkoutInput, 100),
 	}
 }
@@ -23,30 +24,29 @@ func (hub *ProductHub) Run() {
 		case c := <-checkout:
 			r, e := dbs.CheckoutOrder(c.tokUsr, c.payload)
 			if e != nil {
-				c.err <- e
+				c.chanErr <- e
 			} else {
-				c.result <- r
+				c.chanOrder <- r
 			}
 		}
 	}
 }
 
 type checkoutInput struct {
-	tokUsr  *models.User
-	payload *front.CheckoutPayload
-	result  <-chan *front.Order
-	err     <-chan error
+	tokUsr    *models.User
+	payload   *front.CheckoutPayload
+	chanOrder <-chan *front.Order
+	chanErr   <-chan error
 }
 
-func (hub *ProductHub) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (*front.Order, error) {
-	result := make(chan *front.Order)
-	err := make(chan error)
-	input := &checkoutInput{tokUsr, payload, result, err}
+func (hub *ProductHub) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (order *front.Order, err error) {
+	chanOrder := make(chan *front.Order)
+	chanErr := make(chan error)
+	input := &checkoutInput{tokUsr, payload, chanOrder, chanErr}
 	hub.checkout <- input
 	select {
-	case r := <-result:
-		return r, nil
-	case e := <-err:
-		return nil, e
+	case order = <-chanOrder:
+	case err = <-chanErr:
 	}
+	return
 }

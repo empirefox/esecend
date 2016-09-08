@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/empirefox/esecend/config"
+	"github.com/empirefox/esecend/wx"
 	"github.com/empirefox/reform"
 	"github.com/empirefox/reform/dialects/mysql"
 	_ "github.com/go-sql-driver/mysql"
@@ -21,6 +22,7 @@ type CommitTxFn func(t *DbService, commit func() error) error
 
 type DbService struct {
 	config   *config.Config
+	wc       *wx.WxClient
 	DS       *goqu.Dataset
 	Commited bool
 
@@ -29,7 +31,7 @@ type DbService struct {
 	tx      *reform.TX
 }
 
-func NewDbService(config *config.Config, isDebug bool) (*DbService, error) {
+func NewDbService(config *config.Config, wc *wx.WxClient, isDebug bool) (*DbService, error) {
 	conf := &config.Mysql
 
 	db_, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8",
@@ -48,6 +50,7 @@ func NewDbService(config *config.Config, isDebug bool) (*DbService, error) {
 	ds := new(goqu.Dataset)
 	return &DbService{
 		config:  config,
+		wc:      wc,
 		db:      reform.NewDB(db_, mysql.Dialect, reformLogger),
 		DS:      ds.SetAdapter(goqu.NewAdapter("mysql", ds)).Prepared(!isDebug),
 		isDebug: isDebug,
