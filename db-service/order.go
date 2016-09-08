@@ -32,7 +32,164 @@ func (dbs *DbService) GetOrderItems(o *front.Order) ([]*front.OrderItem, error) 
 	return o.Items, nil
 }
 
-// TODO separate ABC and points_pay_only
+// TODO add store1 user1...
+// only abc or points
+func (dbs *DbService) CheckoutOrderOne(
+	tokUsr *models.User, payload *front.CheckoutOnePayload,
+) (*front.Order, error) {
+
+	if payload.SkuID == 0 {
+		return nil, cerr.InvalidSkuId
+	}
+
+	tx, err := dbs.Tx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.RollbackIfNeeded()
+	db := tx.GetDB()
+
+	var sku front.Sku
+	if err = db.FindByPrimaryKeyTo(&sku, payload.SkuID); err != nil {
+		return nil, err
+	}
+	if sku.Stock < 1 {
+		return nil, cerr.InvalidSkuStock
+	}
+
+	isPoints := sku.Points != 0
+
+	var product front.Product
+	if err = db.FindByPrimaryKeyTo(&product, sku.ProductID); err != nil {
+		return nil, err
+	}
+
+	if isPoints == product.IsABC {
+		return nil, cerr.OnlyAbcOrPoints
+	}
+
+	// Attrs: find all inter table data
+	skuToAttrs, err := db.FindAllFrom(front.ProductAttrIdTable, "$SkuID", sku.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(skuToAttrs) == 0 {
+		return nil, cerr.InvalidSkuId
+	}
+
+	// Attrs: query attrs
+	var attrIds []interface{}
+	for _, s2a := range skuToAttrs {
+		attrIds = append(attrIds, s2a.(*front.ProductAttrId).AttrID)
+	}
+	if len(attrIds) == 0 {
+		return nil, cerr.InvalidAttrId
+	}
+	attrs, err := db.FindAllFromPK(front.ProductAttrTable, attrIds...)
+	if err != nil {
+		return nil, err
+	}
+	if len(attrs) != len(attrIds) {
+		return nil, cerr.InvalidAttrId
+	}
+	if len(attrs) != len(payload.Attrs) {
+		return nil, cerr.InvalidAttrLen
+	}
+
+	attrMap := make(map[uint]*front.ProductAttr)
+	var aIds []uint
+	for _, attri := range attrs {
+		attr := attri.(*front.ProductAttr)
+		attrMap[attr.ID] = attr
+		aIds = append(aIds, attr.ID)
+	}
+
+	// Attrs: check equal and load values
+	var attrsCopy []uint
+	attrsCopy = payload.Attrs[:]
+	sortutil.UintSlice(attrsCopy).Sort()
+	sortutil.UintSlice(aIds).Sort()
+
+	for i, id := range aIds {
+		if attrsCopy[i] != id {
+			return nil, cerr.InvalidAttrId
+		}
+	}
+
+	// load values
+	var attrSnapshot []string
+	for _, attrId := range payload.Attrs {
+		attrSnapshot = append(attrSnapshot, attrMap[attrId].Value)
+	}
+
+	// save order
+	order := front.Order{
+		Remark: payload.Remark,
+		UserID: tokUsr.ID,
+
+		// study http://help.vipshop.com/themelist.php?type=detail&id=330
+		State:     front.TOrderStateNopay,
+		CreatedAt: now,
+
+		// OrderAddress
+		Contact:        payload.Contact,
+		Phone:          payload.Phone,
+		DeliverAddress: payload.DeliverAddress,
+	}
+
+	if isPoints {
+		order.PayPoints = sku.Points
+	} else {
+		// Invoice
+		order.InvoiceTo = payload.InvoiceTo
+		order.InvoiceToCom = payload.InvoiceToCom
+		order.PayAmount = sku.SalePrice
+	}
+
+	if err = db.Insert(&order); err != nil {
+		return nil, err
+	}
+
+	item := front.OrderItem{
+		ProductID: sku.ProductID,
+		SkuID:     sku.ID,
+		Quantity:  1,
+		CreatedAt: now,
+		Img:       sku.Img,
+		UserID:    tokUsr.ID,
+		OrderID:   order.ID,
+		StoreID:   product.StoreID,
+		Name:      product.Name,
+		Attrs:     strings.Join(attrSnapshot, " "),
+	}
+	if item.Img == "" {
+		item.Img = product.Img
+	}
+	if isPoints {
+		item.Points = sku.Points
+	} else {
+		item.Price = sku.SalePrice
+		item.IsABC = true
+	}
+
+	// update sku stock
+	sku.Stock--
+	if err = db.UpdateColumns(sku, "Stock"); err != nil {
+		return nil, err
+	}
+	if err = db.Insert(&item); err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	order.Items = []*front.OrderItem{&item}
+	return &order, nil
+}
+
+// no ABC or points
 func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (*front.Order, error) {
 	// prepare skuIds, groupbuyIds to query
 	var skuIds []interface{}
@@ -62,7 +219,8 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	if err != nil {
 		return nil, err
 	}
-	if len(skus) != len(skuIds) {
+	lskus := len(skus)
+	if lskus != len(skuIds) {
 		return nil, cerr.InvalidSkuId
 	}
 
@@ -92,6 +250,9 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	now := time.Now().Unix()
 	for _, skui := range skus {
 		sku := skui.(*front.Sku)
+		if sku.Points != 0 {
+			return nil, cerr.NoAbcOrPoints
+		}
 		num := skuidToPayloadItem[sku.ID].Quantity
 		if num == 0 || num > sku.Stock {
 			return nil, cerr.InvalidSkuStock
@@ -133,10 +294,15 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	if len(products) != len(productIds) {
 		return nil, cerr.InvalidProductId
 	}
+
+	var isABC bool
 	productMap := make(map[uint]*front.Product)
 	for _, producti := range products {
 		product := producti.(*front.Product)
 		productMap[product.ID] = product
+		if product.IsABC {
+			return nil, cerr.NoAbcOrPoints
+		}
 	}
 
 	// check order money
@@ -171,6 +337,9 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		payloadItem := skuidToPayloadItem[skuToAttr.SkuID]
 		payloadItem.AttrIds = append(payloadItem.AttrIds, skuToAttr.AttrID)
 	}
+	if len(attrIdMap) == 0 {
+		return nil, cerr.InvalidAttrId
+	}
 
 	// Attrs: query attrs
 	var attrIds []interface{}
@@ -181,7 +350,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	if err != nil {
 		return nil, err
 	}
-	if len(attrs) == 0 || len(attrs) != len(attrIds) {
+	if len(attrs) != len(attrIds) {
 		return nil, cerr.InvalidAttrId
 	}
 	attrMap := make(map[uint]*front.ProductAttr)

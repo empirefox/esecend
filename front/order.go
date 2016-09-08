@@ -130,12 +130,10 @@ type Order struct {
 }
 
 type CheckoutPayloadItem struct {
-	SkuID         uint
-	Quantity      uint
-	SkuPrice      uint // TODO
-	GroupBuyID    uint
-	GroupBuyPrice uint   // TODO
-	Attrs         []uint // attr ids sorted
+	SkuID      uint
+	Quantity   uint
+	GroupBuyID uint
+	Attrs      []uint // attr ids sorted
 
 	// ids queried from db
 	AttrIds []uint `json:"-"`
@@ -163,6 +161,14 @@ type CheckoutPayload struct {
 	Total        uint // final amount to pay, used to validate
 	DeliverFee   uint
 	IsDeliverPay bool
+}
+
+type CheckoutOnePayload struct {
+	OrderAddress
+	Invoice // only for abc
+	SkuID   uint
+	Attrs   []uint // attr ids sorted
+	Remark  string
 }
 
 type OrderChangeStatePayload struct {

@@ -54,6 +54,8 @@ const (
 	PaykeyNeedBeSet
 	NotEnoughMoney
 	NotEnoughPoints
+	OnlyAbcOrPoints
+	NoAbcOrPoints
 	InvalidPayAmount
 	InvalidPayType
 	NotNopayState
