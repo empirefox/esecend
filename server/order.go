@@ -31,41 +31,23 @@ func (s *Server) PostOrderWxPrepay(c *gin.Context) {
 		return
 	}
 
-	if payload.Cash != 0 || payload.Points != 0 {
+	if payload.OrderID == 0 {
 		front.NewCodev(cerr.InvalidPostBody).Abort(c, http.StatusBadRequest)
 		return
 	}
 
-	payload.Ip = c.ClientIP()
-
 	tokUsr := s.TokenUser(c)
-
-	var args *front.WxPayArgs
-	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		args, cashLocked, pointsLocked, err = tx.PrepayOrder(tokUsr, &payload, s.WxClient)
-		return
-	})
+	order, prepaid, err := s.OrderHub.PrepayOrder(tokUsr.ID, payload.OrderID)
 	if Abort(c, err) {
 		return
 	}
 
-	c.JSON(http.StatusOK, args)
-}
-
-func (s *Server) PostOrderPrepay(c *gin.Context) {
-	var payload front.OrderPrepayPayload
-	if err := c.BindJSON(&payload); Abort(c, err) {
+	if prepaid {
+		c.JSON(http.StatusOK, s.WxClient.NewWxPayArgs(&order.WxPrepayID))
 		return
 	}
-	payload.Ip = c.ClientIP()
 
-	tokUsr := s.TokenUser(c)
-
-	var args *front.WxPayArgs
-	err := s.LockOrderTx(tokUsr.ID, payload.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		args, cashLocked, pointsLocked, err = tx.PrepayOrder(tokUsr, &payload, s.WxClient)
-		return
-	})
+	args, err := s.WxClient.UnifiedOrder(tokUsr, order, c.ClientIP())
 	if Abort(c, err) {
 		return
 	}

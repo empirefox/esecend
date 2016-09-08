@@ -40,6 +40,18 @@ func NewWxClient(config *config.Config) (*WxClient, error) {
 	}, nil
 }
 
+func (wc *WxClient) NewWxPayArgs(prepayId *string) *front.WxPayArgs {
+	args := &front.WxPayArgs{
+		AppId:     wc.wx.AppId,
+		TimeStamp: strconv.FormatInt(time.Now().Unix(), 10),
+		NonceStr:  uniuri.NewLen(32),
+		Package:   "prepay_id=" + *prepayId, // 2hour
+		SignType:  "MD5",
+	}
+	args.PaySign = core.JsapiSign(args.AppId, args.TimeStamp, args.NonceStr, args.Package, args.SignType, wc.wx.ApiKey)
+	return args
+}
+
 // only can be called by PrepayOrder
 func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip string) (*front.WxPayArgs, error) {
 	req := &pay.UnifiedOrderRequest{
@@ -58,15 +70,7 @@ func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip str
 		return nil, err
 	}
 
-	args := &front.WxPayArgs{
-		AppId:     wc.wx.AppId,
-		TimeStamp: strconv.FormatInt(time.Now().Unix(), 10),
-		NonceStr:  uniuri.NewLen(32),
-		Package:   "prepay_id=" + res.PrepayId, // 2hour
-		SignType:  "MD5",
-	}
-	args.PaySign = core.JsapiSign(args.AppId, args.TimeStamp, args.NonceStr, args.Package, args.SignType, wc.wx.ApiKey)
-	return args, nil
+	return wc.NewWxPayArgs(&res.PrepayId), nil
 }
 
 func (wc *WxClient) OnWxPayNotify(r io.Reader) (*WxResponse, map[string]string) {
@@ -107,8 +111,8 @@ func (wc *WxClient) OrderQuery(order *front.Order) (map[string]string, error) {
 		"nonce_str":    uniuri.NewLen(32),
 		"notify_url":   wc.notifyUrl,
 	}
-	if order.TransactionId != "" {
-		req["transaction_id"] = order.TransactionId
+	if order.WxTransactionId != "" {
+		req["transaction_id"] = order.WxTransactionId
 	}
 	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
 	return pay.OrderQuery(wc.Client, req)

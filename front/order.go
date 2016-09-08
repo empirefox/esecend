@@ -36,6 +36,15 @@ const (
 	TOrderStateHistory
 )
 
+type PayType int
+
+const (
+	TPayTypeUnknown PayType = iota
+	TPayTypeWeixin
+	TPayTypeCash
+	TPayTypePoints
+)
+
 //reform:cc_order_item
 type OrderItem struct {
 	ID         uint   `reform:"id,pk"`
@@ -67,18 +76,17 @@ type OrderItem struct {
 
 //reform:cc_order
 type Order struct {
-	//	CashPaidID      uint   `reform:"cash_paid_id"`
-	//	PointsPaidID    uint   `reform:"points_paid_id"`
-	ID              uint   `reform:"id,pk"`
-	PayAmount       uint   `reform:"pay_amount"`
-	WxPaid          uint   `reform:"wx_paid"`
-	WxRefund        uint   `reform:"wx_refund"`
-	CashPaid        uint   `reform:"cash_paid"`
-	CashRefund      uint   `reform:"cash_refund"`
-	PointsPaid      uint   `reform:"points_paid"`
-	AbandonedReason string `reform:"abandoned_reason"`
-	Remark          string `reform:"remark"`
-	UserID          uint   `reform:"user_id" json:"-"` // check owner only
+	ID              uint    `reform:"id,pk"`
+	PayAmount       uint    `reform:"pay_amount"`
+	PayType         PayType `reform:"pay_type"`
+	WxPaid          uint    `reform:"wx_paid"`
+	WxRefund        uint    `reform:"wx_refund"`
+	CashPaid        uint    `reform:"cash_paid"`
+	CashRefund      uint    `reform:"cash_refund"`
+	PointsPaid      uint    `reform:"points_paid"`
+	AbandonedReason string  `reform:"abandoned_reason"`
+	Remark          string  `reform:"remark"`
+	UserID          uint    `reform:"user_id" json:"-"` // check owner only
 	Items           []*OrderItem
 
 	IsDeliverPay bool   `reform:"is_deliver_pay"`
@@ -116,9 +124,10 @@ type Order struct {
 	PointsPayOnly bool `reform:"points_pay_only"`
 
 	// weixin
-	TransactionId string     `reform:"transaction_id" json:"-"`
-	TradeState    TradeState `reform:"trade_state"    json:"-"`
-	WxRefundID    string     `reform:"refund_id"      json:"-"`
+	WxPrepayID      string     `reform:"wx_prepay_id"      json:"-"`
+	WxTransactionId string     `reform:"wx_transaction_id" json:"-"`
+	WxTradeState    TradeState `reform:"wx_trade_state"    json:"-"`
+	WxRefundID      string     `reform:"wx_refund_id"      json:"-"`
 
 	// Invoice
 	InvoiceTo    string `reform:"invoice_to"`
@@ -173,12 +182,6 @@ type OrderChangeStatePayload struct {
 
 type OrderPrepayPayload struct {
 	OrderID uint
-	Amount  uint
-
-	Cash uint
-	Wx   uint
-
-	Ip string // inner
 }
 
 type OrderPrepayResponse struct {

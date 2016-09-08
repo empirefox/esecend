@@ -71,6 +71,7 @@ const (
 	WxOrderAlreadyClosed
 	WxOrderCloseFailed
 	WxOrderAlreadyPaid
+	WxOrderCloseIn5Min
 	WxSystemFailed
 	InvalidCashPrepaid
 	InvalidPrepayPayload

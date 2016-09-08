@@ -30,6 +30,7 @@ type Server struct {
 	DB         *dbsrv.DbService
 	Captcha    captchar.Captchar
 	ProductHub *hub.ProductHub
+	OrderHub   *hub.OrderHub
 
 	ProductResource *search.Resource
 }

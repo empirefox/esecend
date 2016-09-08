@@ -32,6 +32,7 @@ func (dbs *DbService) GetOrderItems(o *front.Order) ([]*front.OrderItem, error) 
 	return o.Items, nil
 }
 
+// TODO separate ABC
 func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.CheckoutPayload) (*front.Order, error) {
 	// prepare skuIds, groupbuyIds to query
 	var skuIds []interface{}
@@ -273,34 +274,28 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	return &order, nil
 }
 
-type PrepayOrderInput struct {
-	TokUsr *models.User
-	Order  *front.Order
-	Ip     string
-}
-
-// prepay with cash, then get wx prepay_id
-// cannot change prepaid when do the 2nd time
-func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArgs, err error) {
-	tokUsr := input.TokUsr
-	order := input.Order
-
-	if payload.Amount == 0 {
-		err = cerr.InvalidPayAmount
-		return
-	}
-
+func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid bool, err error) {
 	db := dbs.GetDB()
 
 	var order front.Order
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(orderId)).Where(goqu.I("$UserID").Eq(userId))
 	if err = db.DsSelectOneTo(&order, ds); err != nil {
 		return
 	}
 
 	// prepay after prepaid
 	if order.State == front.TOrderStatePrepaid {
-		// close transaction_id firstly
+		durPrepaid := time.Now().Unix() - order.PrepaidAt
+		if durPrepaid < 290 {
+			o = &order
+			prepaid = true
+			return
+		}
+		if durPrepaid < 300 {
+			err = cerr.WxOrderCloseIn5Min
+			return
+		}
+		// close transaction_id first
 		var res map[string]string
 		res, err = dbs.wc.OrderClose(&order)
 		if err != nil {
@@ -308,9 +303,7 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 		}
 
 		if res["result_code"] == "SUCCESS" {
-			// need to another goroutine
-			args, err = dbs.wc.UnifiedOrder(tokUsr, &order, payload.Ip)
-			return
+			o = &order
 		} else {
 			// colse FAIL
 			log.WithFields(l.Locate(logrus.Fields{
@@ -324,41 +317,28 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 			case "SYSTEMERROR":
 				err = cerr.WxSystemFailed
 			case "ORDERNOTEXIST", "ORDERCLOSED":
-				// need to another goroutine
-				args, err = tx.wc.UnifiedOrder(tokUsr, order, input.Ip, attach)
-				return
-
+				o = &order
 			default:
 				err = cerr.ApiImplementFailed
 			}
-			if err != nil {
-				return
-			}
 		}
-	} else if err = PermitOrderState(&order, front.TOrderStatePrepaid); err != nil {
+		return
+	}
+
+	if err = PermitOrderState(&order, front.TOrderStatePrepaid); err != nil {
 		err = cerr.NotNopayState
 		return
 	}
 
-	if order.PayAmount != payload.Amount {
-		err = cerr.InvalidPayAmount
-		return
-	}
-
-	now := time.Now().Unix()
-
 	order.State = front.TOrderStatePrepaid
-	order.PrepaidAt = now
-	order.TransactionId = ""
-	order.TradeState = front.UNKNOWN
+	order.PrepaidAt = time.Now().Unix()
+	order.WxTransactionId = ""
+	order.WxTradeState = front.UNKNOWN
 
-	err = db.UpdateColumns(&order, "CashPaid", "State", "PrepaidAt", "TransactionId", "TradeState")
-
+	err = db.UpdateColumns(&order, "State", "PrepaidAt", "WxTransactionId", "WxTradeState")
 	if err == nil {
-		// need to another goroutine
-		args, err = dbs.wc.UnifiedOrder(tokUsr, &order, input.Ip)
+		o = &order
 	}
-
 	return
 }
 
@@ -674,7 +654,7 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order) (err
 func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]string) (err error) {
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
-	if order.TradeState == tradeState && order.TransactionId == tid {
+	if order.WxTradeState == tradeState && order.WxTransactionId == tid {
 		// no need update
 		return
 	}
@@ -701,27 +681,27 @@ func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]strin
 		}
 
 		data := front.Order{
-			ID:            order.ID,
-			WxPaid:        uint(totalFee64),
-			TransactionId: tid,
-			TradeState:    tradeState,
-			State:         front.TOrderStatePaid,
-			PaidAt:        timeEnd.Unix(),
+			ID:              order.ID,
+			WxPaid:          uint(totalFee64),
+			WxTransactionId: tid,
+			WxTradeState:    tradeState,
+			State:           front.TOrderStatePaid,
+			PaidAt:          timeEnd.Unix(),
 		}
-		err = dbs.GetDB().UpdateColumns(&data, "WxPaid", "TransactionId", "TradeState", "State", "PaidAt")
+		err = dbs.GetDB().UpdateColumns(&data, "WxPaid", "WxTransactionId", "WxTradeState", "State", "PaidAt")
 		if err != nil {
 			return
 		}
 		order.WxPaid = data.WxPaid
-		order.TransactionId = data.TransactionId
-		order.TradeState = data.TradeState
+		order.WxTransactionId = data.WxTransactionId
+		order.WxTradeState = data.WxTradeState
 		order.State = data.State
 		order.PaidAt = data.PaidAt
 
 	case front.REFUND, front.USERPAYING, front.PAYERROR:
-		err = dbs.GetDB().UpdateColumns(&front.Order{ID: order.ID, TradeState: tradeState}, "TradeState")
+		err = dbs.GetDB().UpdateColumns(&front.Order{ID: order.ID, WxTradeState: tradeState}, "WxTradeState")
 		if err == nil {
-			order.TradeState = tradeState
+			order.WxTradeState = tradeState
 		}
 
 	case front.CLOSED:
