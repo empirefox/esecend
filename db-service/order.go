@@ -1,8 +1,6 @@
 package dbsrv
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -275,44 +273,6 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	return &order, nil
 }
 
-// only used by PrepayOrder
-func (tx *DbService) prepayOrderAfterClosedWxOrder(input *PrepayOrderInput) (args *front.WxPayArgs, err error) {
-	tokUsr := input.TokUsr
-	order := input.Order
-	db := tx.GetDB()
-
-	var cash front.UserCash
-	ds := tx.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TUserCashPrepay))
-	if err = db.DsSelectOneTo(&cash, ds); err != nil && err != reform.ErrNoRows {
-		return
-	}
-
-	if uint(-cash.Amount) == order.CashPaid {
-		// no need prepay again
-		if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
-			return
-		}
-
-		attach := &models.UnifiedOrderAttach{
-			PreCashID: cash.ID,
-			CashPaid:  order.CashPaid,
-			UserID:    tokUsr.ID,
-		}
-
-		// need to another goroutine
-		args, err = tx.wc.UnifiedOrder(tokUsr, order, input.Ip, attach)
-		return
-	}
-
-	// refund is allowed only when close order
-	if cash.ID != 0 {
-		err = cerr.OrderCloseNeeded
-	}
-
-	// args==nil err==nil means go on
-	return
-}
-
 type PrepayOrderInput struct {
 	TokUsr *models.User
 	Order  *front.Order
@@ -325,11 +285,7 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 	tokUsr := input.TokUsr
 	order := input.Order
 
-	if payload.Wx == 0 {
-		err = cerr.NotPrepayOrder
-		return
-	}
-	if payload.Amount != payload.Cash+payload.Wx || payload.Amount == 0 {
+	if payload.Amount == 0 {
 		err = cerr.InvalidPayAmount
 		return
 	}
@@ -344,10 +300,6 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 
 	// prepay after prepaid
 	if order.State == front.TOrderStatePrepaid {
-		if order.CashPaid != payload.Cash {
-			err = cerr.InvalidPrepayPayload
-			return
-		}
 		// close transaction_id firstly
 		var res map[string]string
 		res, err = dbs.wc.OrderClose(&order)
@@ -356,31 +308,8 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 		}
 
 		if res["result_code"] == "SUCCESS" {
-			var flow front.UserCash
-			if order.CashPaid != 0 {
-				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TUserCashPrepay))
-				if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-					return
-				}
-				if uint(-flow.Amount) != order.CashPaid {
-					err = cerr.InvalidCashPrepaid
-					return
-				}
-
-			}
-
-			if err = db.UpdateColumns(&front.Order{ID: order.ID}, "TransactionId", "TradeState"); err != nil {
-				return
-			}
-
-			attach := &models.UnifiedOrderAttach{
-				PreCashID: flow.ID,
-				CashPaid:  order.CashPaid,
-				UserID:    tokUsr.ID,
-			}
-
 			// need to another goroutine
-			args, err = dbs.wc.UnifiedOrder(tokUsr, &order, payload.Ip, attach)
+			args, err = dbs.wc.UnifiedOrder(tokUsr, &order, payload.Ip)
 			return
 		} else {
 			// colse FAIL
@@ -395,14 +324,9 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 			case "SYSTEMERROR":
 				err = cerr.WxSystemFailed
 			case "ORDERNOTEXIST", "ORDERCLOSED":
-				// TODO remove this?
-				// check prepaid
-				args, err = dbs.prepayOrderAfterClosedWxOrder(tokUsr, &order, payload.Ip)
-				if args != nil {
-					// return OK!
-					return
-				}
-				// to be continued, do DO NOT return!
+				// need to another goroutine
+				args, err = tx.wc.UnifiedOrder(tokUsr, order, input.Ip, attach)
+				return
 
 			default:
 				err = cerr.ApiImplementFailed
@@ -422,38 +346,7 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 	}
 
 	now := time.Now().Unix()
-	attach := models.UnifiedOrderAttach{
-		UserID: tokUsr.ID,
-	}
 
-	if payload.Cash != 0 {
-		var flow front.UserCash
-		ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
-		if err = db.DsSelectOneTo(&flow, ds); err != nil {
-			return
-		}
-
-		if flow.Balance < int(payload.Cash) {
-			err = cerr.NotEnoughMoney
-			return
-		}
-
-		err = db.Save(&front.UserCash{
-			UserID:    tokUsr.ID,
-			CreatedAt: now,
-			Type:      front.TUserCashPrepay,
-			Amount:    -int(payload.Cash),
-			Balance:   flow.Balance - int(payload.Cash),
-			OrderID:   order.ID,
-		})
-		if err != nil {
-			return
-		}
-		attach.CashPaid = payload.Cash
-		attach.PreCashID = flow.ID
-	}
-
-	order.CashPaid = attach.CashPaid
 	order.State = front.TOrderStatePrepaid
 	order.PrepaidAt = now
 	order.TransactionId = ""
@@ -463,7 +356,7 @@ func (dbs *DbService) PrepayOrder(input *PrepayOrderInput) (args *front.WxPayArg
 
 	if err == nil {
 		// need to another goroutine
-		args, err = dbs.wc.UnifiedOrder(tokUsr, &order, input.Ip, &attach)
+		args, err = dbs.wc.UnifiedOrder(tokUsr, &order, input.Ip)
 	}
 
 	return
@@ -568,41 +461,6 @@ func (dbs *DbService) OrderChangeState(
 			err = db.UpdateColumns(order, "CanceledAt", "State")
 			return
 		case front.TOrderStatePrepaid:
-
-			var flow front.UserCash
-			ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TUserCashPrepay))
-			if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
-				return
-			}
-			if flow.ID != 0 {
-				// repaid
-				var flow2 front.UserCash
-				ds = dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TUserCashPrepayBack))
-				if err = db.DsSelectOneTo(&flow2, ds); err != nil && err != reform.ErrNoRows {
-					return
-				}
-				if flow2.ID == 0 {
-					// not refund yet
-					var flow1 front.UserCash
-					ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
-					if err = db.DsSelectOneTo(&flow1, ds); err != nil {
-						return
-					}
-					// refund
-					err = db.Save(&front.UserCash{
-						UserID:    tokUsr.ID,
-						CreatedAt: now,
-						Type:      front.TUserCashPrepayBack, // Trade type
-						Amount:    -flow.Amount,
-						Balance:   flow1.Balance - flow.Amount,
-						OrderID:   order.ID,
-					})
-					if err != nil {
-						return
-					}
-				}
-			}
-
 			order.State = front.TOrderStateCanceled
 			order.CanceledAt = now
 			err = db.UpdateColumns(order, "CanceledAt", "State")
@@ -675,7 +533,6 @@ func (dbs *DbService) OrderChangeState(
 func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (err error) {
 	db := dbs.GetDB()
 
-	// lock order before tx
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(claims.OrderID))
 	err = db.DsSelectOneTo(order, ds)
 	if err != nil {
@@ -814,8 +671,7 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order) (err
 	return
 }
 
-func (dbs *DbService) UpdateWxOrderSate(tokUsr *models.User, order *front.Order, src map[string]string) (err error) {
-
+func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]string) (err error) {
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
 	if order.TradeState == tradeState && order.TransactionId == tid {
@@ -829,30 +685,6 @@ func (dbs *DbService) UpdateWxOrderSate(tokUsr *models.User, order *front.Order,
 		return
 	}
 
-	var attach models.UnifiedOrderAttach
-	attachB64, hasAttach := src["attach"]
-	if hasAttach {
-		var attachBs []byte
-		attachBs, err = base64.URLEncoding.DecodeString(attachB64)
-		if err != nil {
-			return
-		}
-
-		err = json.Unmarshal(attachBs, &attach)
-		if err != nil {
-			return
-		}
-
-		if attach.CashPaid != order.CashPaid {
-			err = cerr.InvalidPayAmount
-			return
-		}
-		if tokUsr != nil && attach.UserID != tokUsr.ID {
-			err = cerr.InvalidUserID
-			return
-		}
-	}
-
 	switch tradeState {
 	case front.SUCCESS:
 		if err = dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
@@ -861,19 +693,6 @@ func (dbs *DbService) UpdateWxOrderSate(tokUsr *models.User, order *front.Order,
 				"State":   order.State,
 			})).Info("Got wxpay with SUCCESS")
 			return
-		}
-		if hasAttach && order.State == front.TOrderStatePrepaid {
-			now := time.Now().Unix()
-			if attach.PreCashID != 0 {
-				ds := dbs.DS.Where(goqu.I(front.UserCashTable.PK()).Eq(attach.PreCashID)).Where(goqu.I("$UserID").Eq(attach.UserID))
-				_, err = dbs.GetDB().DsUpdateColumns(&front.UserCash{
-					Type:      front.TUserCashTrade,
-					CreatedAt: now,
-				}, ds, "Type", "CreatedAt")
-				if err != nil {
-					return
-				}
-			}
 		}
 
 		timeEnd, errTime := time.Parse("20060102150405", src["time_end"])

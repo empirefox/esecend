@@ -2,8 +2,6 @@ package wx
 
 import (
 	"crypto/md5"
-	"encoding/base64"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -43,7 +41,7 @@ func NewWxClient(config *config.Config) (*WxClient, error) {
 }
 
 // only can be called by PrepayOrder
-func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip string, attach *models.UnifiedOrderAttach) (*front.WxPayArgs, error) {
+func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip string) (*front.WxPayArgs, error) {
 	req := &pay.UnifiedOrderRequest{
 		DeviceInfo:     "WEB",
 		Body:           wc.wx.PayBody,
@@ -53,10 +51,6 @@ func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip str
 		NotifyURL:      wc.wx.PayNotifyURL,
 		TradeType:      "JSAPI",
 		OpenId:         tokUsr.OpenId,
-	}
-	if attach != nil && attach.CashPaid != 0 && attach.PointsPaid != 0 {
-		attachBs, _ := json.Marshal(attach)
-		req.Attach = base64.URLEncoding.EncodeToString(attachBs)
 	}
 
 	res, err := pay.UnifiedOrder2(wc.Client, req)
