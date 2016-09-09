@@ -32,7 +32,6 @@ func (dbs *DbService) GetOrderItems(o *front.Order) ([]*front.OrderItem, error) 
 	return o.Items, nil
 }
 
-// TODO add store1 user1...
 // only abc or points
 func (dbs *DbService) CheckoutOrderOne(
 	tokUsr *models.User, payload *front.CheckoutOnePayload,
@@ -135,6 +134,7 @@ func (dbs *DbService) CheckoutOrderOne(
 		Contact:        payload.Contact,
 		Phone:          payload.Phone,
 		DeliverAddress: payload.DeliverAddress,
+		User1:          tokUsr.User1,
 	}
 
 	if isPoints {
@@ -150,6 +150,17 @@ func (dbs *DbService) CheckoutOrderOne(
 		return nil, err
 	}
 
+	// store1
+	var store1 uint
+	if product.StoreID != 0 {
+		var store front.Store
+		err = db.FindByPrimaryKeyTo(&store, product.StoreID)
+		if err != nil && err != reform.ErrNoRows {
+			return nil, err
+		}
+		store1 = store.User1
+	}
+
 	item := front.OrderItem{
 		ProductID: sku.ProductID,
 		SkuID:     sku.ID,
@@ -161,6 +172,7 @@ func (dbs *DbService) CheckoutOrderOne(
 		StoreID:   product.StoreID,
 		Name:      product.Name,
 		Attrs:     strings.Join(attrSnapshot, " "),
+		Store1:    store1,
 	}
 	if item.Img == "" {
 		item.Img = product.Img
@@ -390,6 +402,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		PayAmount: total,
 		Remark:    payload.Remark,
 		UserID:    tokUsr.ID,
+		User1:     tokUsr.User1,
 
 		IsDeliverPay: payload.IsDeliverPay,
 		DeliverFee:   payload.DeliverFee,
@@ -412,6 +425,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		return nil, err
 	}
 
+	store1Map := make(map[uint]uint)
 	// complete order items after order saved
 	for _, item := range items {
 		product := productMap[item.ProductID]
@@ -424,13 +438,28 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		}
 		item.Attrs = skuidToPayloadItem[item.SkuID].AttrValues
 
+		// store1
+		if product.StoreID != 0 {
+			if store1, ok := store1Map[product.StoreID]; ok {
+				item.Store1 = store1
+			} else {
+				var store front.Store
+				err = db.FindByPrimaryKeyTo(&store, product.StoreID)
+				if err != nil && err != reform.ErrNoRows {
+					return nil, err
+				}
+				store1Map[product.StoreID] = store.User1
+				item.Store1 = store.User1
+			}
+		}
+
 		// update sku stock
 		sku := skuMap[item.SkuID]
 		sku.Stock -= item.Quantity
-		if err := db.UpdateColumns(sku, "Stock"); err != nil {
+		if err = db.UpdateColumns(sku, "Stock"); err != nil {
 			return nil, err
 		}
-		if err := db.Insert(item); err != nil {
+		if err = db.Insert(item); err != nil {
 			return nil, err
 		}
 	}

@@ -3,8 +3,9 @@ package front
 
 //reform:cc_store
 type Store struct {
-	ID   uint   `reform:"id,pk"`
-	Name string `reform:"name"`
+	ID    uint   `reform:"id,pk"`
+	Name  string `reform:"name"`
+	User1 uint   `reform:"user1"`
 }
 
 //reform:cc_store_cash
