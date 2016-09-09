@@ -4,15 +4,15 @@ import (
 	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
-	"gopkg.in/reform.v1"
 
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
+	"github.com/empirefox/reform"
 )
 
 const (
-	DaySeconds uint64 = 3600 * 24
+	DaySeconds int64 = 3600 * 24
 )
 
 func (dbs *DbService) OrdersMaintanence() error {
@@ -31,8 +31,9 @@ func (dbs *DbService) OrdersMaintanence() error {
 	if err != nil {
 		return err
 	}
-	for _, order := range orders {
-		if err = dbs.OrderMaintanence(order.(*front.Order)); err != nil {
+	for _, iorder := range orders {
+		order := iorder.(*front.Order)
+		if _, err = dbs.OrderMaintanence(*order); err != nil {
 			return err
 		}
 	}
@@ -46,25 +47,25 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 
 	var cols []string
 
-	if dbs.IsOrderAutoCompletedUnsaved(order) {
+	if dbs.IsOrderAutoCompletedUnsaved(&order) {
 		order.AutoCompleted = true
 		order.CompletedAt = order.DeliveredAt + int64(dbs.config.Order.CompleteTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateCompleted
 		cols = append(cols, "AutoCompleted", "CompletedAt", "State")
 	}
-	if dbs.IsOrderAutoEvaledUnsaved(order) {
+	if dbs.IsOrderAutoEvaledUnsaved(&order) {
 		order.AutoEvaled = true
 		order.EvalAt = order.CompletedAt + int64(dbs.config.Order.EvalTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateEvaled
 		cols = append(cols, "AutoEvaled", "EvalAt", "State")
 	}
-	if dbs.IsOrderHistoryUnsaved(order) {
+	if dbs.IsOrderHistoryUnsaved(&order) {
 		order.HistoryAt = order.EvalAt + int64(dbs.config.Order.HistoryTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateHistory
 		cols = append(cols, "HistoryAt", "State")
 	}
 
-	items, err1 := dbs.GetOrderItems(order)
+	items, err1 := dbs.GetOrderItems(&order)
 	if err1 != nil {
 		err = err1
 		return
@@ -229,7 +230,7 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 			// 2. get exist vips of user
 			var iUserVips []reform.Struct
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID), goqu.I("$ExpiresAt").Gt(now))
-			iUserVips, err = db.DsSelectAllFrom(models.VipRebateOriginTable, ds)
+			iUserVips, err = db.DsSelectAllFrom(front.VipRebateOriginTable, ds)
 			if err != nil {
 				return
 			}

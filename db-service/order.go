@@ -120,6 +120,8 @@ func (dbs *DbService) CheckoutOrderOne(
 		attrSnapshot = append(attrSnapshot, attrMap[attrId].Value)
 	}
 
+	now := time.Now().Unix()
+
 	// save order
 	order := front.Order{
 		Remark: payload.Remark,
@@ -185,7 +187,7 @@ func (dbs *DbService) CheckoutOrderOne(
 
 	// update sku stock
 	sku.Stock--
-	if err = db.UpdateColumns(sku, "Stock"); err != nil {
+	if err = db.UpdateColumns(&sku, "Stock"); err != nil {
 		return nil, err
 	}
 	if err = db.Insert(&item); err != nil {
@@ -306,7 +308,6 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 		return nil, cerr.InvalidProductId
 	}
 
-	var isABC bool
 	productMap := make(map[uint]*front.Product)
 	for _, producti := range products {
 		product := producti.(*front.Product)
@@ -565,10 +566,10 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 
 	var order front.Order
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.OrderID), goqu.I("$UserID").Eq(tokUsr.ID))
-	if err = db.DsSelectOneTo(order, ds); err != nil {
+	if err = db.DsSelectOneTo(&order, ds); err != nil {
 		return
 	}
-	if err = PermitOrderState(order, front.TOrderStatePaid); err != nil {
+	if err = PermitOrderState(&order, front.TOrderStatePaid); err != nil {
 		err = cerr.NoWayToPaidState
 		return
 	}
@@ -608,7 +609,7 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 		order.PointsPaid = payload.Amount
 		order.State = front.TOrderStatePaid
 		order.PaidAt = now
-		err = db.UpdateColumns(order, "PointsPaid", "State", "PaidAt")
+		err = db.UpdateColumns(&order, "PointsPaid", "State", "PaidAt")
 	} else if !payload.IsPoints && order.PayPoints == 0 {
 		if order.PayAmount != payload.Amount {
 			err = cerr.InvalidPayAmount
@@ -643,7 +644,7 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 		order.CashPaid = payload.Amount
 		order.State = front.TOrderStatePaid
 		order.PaidAt = now
-		err = db.UpdateColumns(order, "CashPaid", "State", "PaidAt")
+		err = db.UpdateColumns(&order, "CashPaid", "State", "PaidAt")
 	} else {
 		err = cerr.InvalidPayType
 	}

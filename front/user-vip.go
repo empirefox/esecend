@@ -1,3 +1,4 @@
+//go:generate reform
 package front
 
 //reform:cc_vip_rebate_origin

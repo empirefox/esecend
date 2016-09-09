@@ -120,7 +120,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 				var top front.UserCash
 				ds = dbs.DS.Where(goqu.I("$UserID").Eq(vip.User1)).Order(goqu.I("$CreatedAt").Desc())
 				if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
-					return
+					return err
 				}
 
 				err = db.Insert(&front.UserCash{
@@ -132,7 +132,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 					Balance:   top.Balance + int(dbs.config.Money.RewardFromVipRebateDone),
 				})
 				if err != nil {
-					return
+					return err
 				}
 			}
 		}
@@ -170,12 +170,12 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			return err
 		}
 
-		if vip.ID == 0 {
+		if vip.ID != 0 {
 			// reward in time
 			var top front.UserCash
 			ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 			if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
-				return
+				return err
 			}
 
 			usr1CashBalance := top.Balance
@@ -191,30 +191,22 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 					Balance:   usr1CashBalance,
 				})
 				if err != nil {
-					return
+					return err
 				}
 			}
 		} else {
 			// freeze reward
-			var top front.UserCashFrozen
-			ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
-			if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
-				return
-			}
-
-			usrCashBalance := top.Balance
 			for _, ivip := range ivips {
 				vip := ivip.(*front.VipRebateOrigin)
-				usrCashBalance += int(dbs.config.Money.RewardFromVipCent)
 				err = db.Insert(&front.UserCashFrozen{
 					UserID:    tokUsr.ID,
 					OrderID:   vip.OrderID,
 					CreatedAt: now,
-					Type:      front.TUserCashRebate,
-					Amount:    int(dbs.config.Money.RewardFromVipCent),
+					Type:      front.TUserCashReward,
+					Amount:    dbs.config.Money.RewardFromVipCent,
 				})
 				if err != nil {
-					return
+					return err
 				}
 			}
 		}

@@ -47,18 +47,19 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 		return cerr.AmountLimit
 	}
 
+	db := dbs.GetDB()
+
 	var top front.UserCash
-	ds = dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
+	ds := dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 	if err := db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
 		return err
 	}
 
-	if top.Balance < payload.Amount {
+	if top.Balance < int(payload.Amount) {
 		return cerr.NotEnoughMoney
 	}
 
 	now := time.Now().Unix()
-	db := dbs.GetDB()
 
 	cash := &front.UserCash{
 		UserID:    tokUsr.ID,

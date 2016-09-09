@@ -7,11 +7,11 @@ import (
 
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
-	"github.com/empirefox/esecend/lok"
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/reform"
 )
 
+// TODO move to hub
 func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payload *front.EvalItem) (*front.EvalResponse, error) {
 	name := []rune(tokUsr.Nickname)
 	switch l := len(name); l {
@@ -29,11 +29,6 @@ func (dbs *DbService) EvalSave(tokUsr *models.User, orderId, itemId uint, payloa
 
 	payload.EvalName = string(name)
 	payload.EvalAt = time.Now().Unix()
-
-	if !lok.OrderLok.Lock(orderId) {
-		return nil, cerr.OrderTmpLocked
-	}
-	defer lok.OrderLok.Unlock(orderId)
 
 	var order front.Order
 	var ra uint
