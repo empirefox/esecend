@@ -11,7 +11,6 @@ import (
 	"github.com/cznic/sortutil"
 	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/cerr"
-	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/l"
 	"github.com/empirefox/esecend/models"
@@ -910,7 +909,7 @@ func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]strin
 
 	switch tradeState {
 	case front.SUCCESS:
-		if err = dbsrv.PermitOrderState(order, front.TOrderStatePaid); err != nil {
+		if err = PermitOrderState(order, front.TOrderStatePaid); err != nil {
 			log.WithFields(l.Locate(logrus.Fields{
 				"OrderID": order.ID,
 				"State":   order.State,

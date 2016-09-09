@@ -12,6 +12,7 @@ import (
 	"github.com/empirefox/reform"
 	"github.com/empirefox/reform/dialects/mysql"
 	_ "github.com/go-sql-driver/mysql"
+
 	"gopkg.in/doug-martin/goqu.v3"
 	_ "gopkg.in/doug-martin/goqu.v3/adapters/mysql"
 )
