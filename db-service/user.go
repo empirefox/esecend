@@ -91,5 +91,5 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 		return nil, cerr.WithdrawFailed
 	}
 
-	return &cash, nil
+	return cash, nil
 }

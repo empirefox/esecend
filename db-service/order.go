@@ -472,11 +472,11 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	return &order, nil
 }
 
-func (dbs *DbService) PrepayOrder(userId, orderId uint, ip *string) (o *front.Order, args *front.WxPayArgs, err error) {
+func (dbs *DbService) PrepayOrder(tokUsr *models.User, orderId uint, ip *string) (o *front.Order, args *front.WxPayArgs, err error) {
 	db := dbs.GetDB()
 
 	var order front.Order
-	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(orderId)).Where(goqu.I("$UserID").Eq(userId))
+	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(orderId)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
 	if err = db.DsSelectOneTo(&order, ds); err != nil {
 		return
 	}
@@ -536,7 +536,7 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint, ip *string) (o *front.Or
 	}
 
 	var preid *string
-	preid, args, err = dbs.wc.UnifiedOrder(tokUsr, order, ip)
+	preid, args, err = dbs.wc.UnifiedOrder(tokUsr, &order, ip)
 	if err != nil {
 		return
 	}
@@ -548,10 +548,10 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint, ip *string) (o *front.Or
 	order.WxTradeState = front.UNKNOWN
 
 	err = db.UpdateColumns(&order, "State", "PrepaidAt", "WxTransactionId", "WxTradeState", "WxPrepayID")
-	if err != nil {
-		return
+	if err == nil {
+		o = &order
 	}
-	o = &order
+	return
 }
 
 // no wx pay, need paykey
