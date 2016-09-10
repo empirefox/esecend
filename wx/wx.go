@@ -3,7 +3,6 @@ package wx
 import (
 	"crypto/md5"
 	"encoding/xml"
-	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -85,13 +84,6 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) (*WxResponse, map[string]string) 
 	sign := core.Sign(m, wc.wx.ApiKey, md5.New)
 	if sign != m["sign"] {
 		return NewWxResponse("FAIL", "failed to validate md5"), nil
-	}
-
-	var at int64
-	var id uint
-	_, err = fmt.Sscanf(m["out_trade_no"], "%d-%d", &at, &id)
-	if err != nil {
-		return NewWxResponse("FAIL", "failed to parse out_trade_no"), nil
 	}
 
 	if m["result_code"] == "SUCCESS" {

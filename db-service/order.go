@@ -915,6 +915,14 @@ func (dbs *DbService) OrderPaidState(tokUsr *models.User, orderId uint) (order *
 	return order, dbs.UpdateWxOrderSate(order, src)
 }
 
+func (dbs *DbService) OnWxPayNotify(src map[string]string, orderId uint) error {
+	order, err := dbs.GetBareOrder(nil, orderId)
+	if err != nil {
+		return err
+	}
+	return dbs.UpdateWxOrderSate(order, src)
+}
+
 func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]string) (err error) {
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
