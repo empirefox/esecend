@@ -6,26 +6,28 @@ import (
 )
 
 type prepayOrderResult struct {
-	order   *front.Order
-	prepaid bool
+	order *front.Order
+	args  *front.WxPayArgs
 }
 
 type prepayOrderInput struct {
 	userId     uint
 	orderId    uint
+	ip         *string
 	chanResult <-chan *prepayOrderResult
 	chanErr    <-chan error
 }
 
-func (hub *OrderHub) PrepayOrder(userId, orderId uint) (order *front.Order, prepaid bool, err error) {
+func (hub *OrderHub) PrepayOrder(userId, orderId uint, cip string) (order *front.Order, args *front.WxPayArgs, err error) {
 	chanResult := make(chan *prepayOrderResult)
 	chanErr := make(chan error)
-	in := prepayOrderInput{userId, orderId, chanResult, chanErr}
+	ip := &cip
+	in := prepayOrderInput{userId, orderId, ip, chanResult, chanErr}
 	hub.chanInput <- in
 
 	select {
 	case result := <-chanResult:
-		order, prepaid = result.order, result.prepaid
+		order, args = result.order, result.args
 	case err = <-chanErr:
 	}
 	return
@@ -33,13 +35,13 @@ func (hub *OrderHub) PrepayOrder(userId, orderId uint) (order *front.Order, prep
 
 func (hub *OrderHub) onPrepayOrder(tx *dbsrv.DbService, in *prepayOrderInput) {
 	var order *front.Order
-	var prepaid bool
+	var args *front.WxPayArgs
 	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
-		order, prepaid, err = tx.PrepayOrder(in.userId, in.orderId)
+		order, args, err = tx.PrepayOrder(in.userId, in.orderId, in.ip)
 	})
 	if err != nil {
 		in.chanErr <- err
 	} else {
-		in.chanResult <- &prepayOrderResult{order, prepaid}
+		in.chanResult <- &prepayOrderResult{order, args}
 	}
 }

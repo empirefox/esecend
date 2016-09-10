@@ -472,7 +472,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	return &order, nil
 }
 
-func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid bool, err error) {
+func (dbs *DbService) PrepayOrder(userId, orderId uint, ip *string) (o *front.Order, args *front.WxPayArgs, err error) {
 	db := dbs.GetDB()
 
 	var order front.Order
@@ -487,12 +487,14 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 		return
 	}
 
+	now := time.Now().Unix()
+
 	// prepay after prepaid
 	if order.State == front.TOrderStatePrepaid {
-		durPrepaid := time.Now().Unix() - order.PrepaidAt
+		durPrepaid := now - order.PrepaidAt
 		if durPrepaid < 290 {
 			o = &order
-			prepaid = true
+			args = dbs.wc.NewWxPayArgs(&order.WxPrepayID)
 			return
 		}
 		if durPrepaid < 300 {
@@ -506,9 +508,7 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 			return
 		}
 
-		if res["result_code"] == "SUCCESS" {
-			o = &order
-		} else {
+		if res["result_code"] != "SUCCESS" {
 			// colse FAIL
 			log.WithFields(l.Locate(logrus.Fields{
 				"out_trade_no": order.TrackingNumber(),
@@ -520,13 +520,14 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 				err = cerr.WxOrderAlreadyPaid
 			case "SYSTEMERROR":
 				err = cerr.WxSystemFailed
-			case "ORDERNOTEXIST", "ORDERCLOSED":
-				o = &order
+			case "ORDERNOTEXIST", "ORDERCLOSED": // pass
 			default:
 				err = cerr.ApiImplementFailed
 			}
+			if err != nil {
+				return
+			}
 		}
-		return
 	}
 
 	if err = PermitOrderState(&order, front.TOrderStatePrepaid); err != nil {
@@ -534,16 +535,23 @@ func (dbs *DbService) PrepayOrder(userId, orderId uint) (o *front.Order, prepaid
 		return
 	}
 
+	var preid *string
+	preid, args, err = dbs.wc.UnifiedOrder(tokUsr, order, ip)
+	if err != nil {
+		return
+	}
+
+	order.WxPrepayID = *preid
 	order.State = front.TOrderStatePrepaid
-	order.PrepaidAt = time.Now().Unix()
+	order.PrepaidAt = now
 	order.WxTransactionId = ""
 	order.WxTradeState = front.UNKNOWN
 
-	err = db.UpdateColumns(&order, "State", "PrepaidAt", "WxTransactionId", "WxTradeState")
-	if err == nil {
-		o = &order
+	err = db.UpdateColumns(&order, "State", "PrepaidAt", "WxTransactionId", "WxTradeState", "WxPrepayID")
+	if err != nil {
+		return
 	}
-	return
+	o = &order
 }
 
 // no wx pay, need paykey

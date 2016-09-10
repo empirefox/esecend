@@ -53,13 +53,13 @@ func (wc *WxClient) NewWxPayArgs(prepayId *string) *front.WxPayArgs {
 }
 
 // only can be called by PrepayOrder
-func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip string) (*front.WxPayArgs, error) {
+func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip *string) (*string, *front.WxPayArgs, error) {
 	req := &pay.UnifiedOrderRequest{
 		DeviceInfo:     "WEB",
 		Body:           wc.wx.PayBody,
 		OutTradeNo:     order.TrackingNumber(),
 		TotalFee:       int64(order.PayAmount),
-		SpbillCreateIP: ip,
+		SpbillCreateIP: *ip,
 		NotifyURL:      wc.wx.PayNotifyURL,
 		TradeType:      "JSAPI",
 		OpenId:         tokUsr.OpenId,
@@ -67,10 +67,10 @@ func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip str
 
 	res, err := pay.UnifiedOrder2(wc.Client, req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return wc.NewWxPayArgs(&res.PrepayId), nil
+	return &res.PrepayId, wc.NewWxPayArgs(&res.PrepayId), nil
 }
 
 func (wc *WxClient) OnWxPayNotify(r io.Reader) (*WxResponse, map[string]string) {

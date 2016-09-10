@@ -37,17 +37,7 @@ func (s *Server) PostOrderWxPrepay(c *gin.Context) {
 	}
 
 	tokUsr := s.TokenUser(c)
-	order, prepaid, err := s.OrderHub.PrepayOrder(tokUsr.ID, payload.OrderID)
-	if Abort(c, err) {
-		return
-	}
-
-	if prepaid {
-		c.JSON(http.StatusOK, s.WxClient.NewWxPayArgs(&order.WxPrepayID))
-		return
-	}
-
-	args, err := s.WxClient.UnifiedOrder(tokUsr, order, c.ClientIP())
+	_, args, err := s.OrderHub.PrepayOrder(tokUsr.ID, payload.OrderID, c.ClientIP())
 	if Abort(c, err) {
 		return
 	}

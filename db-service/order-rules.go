@@ -10,6 +10,7 @@ var orderRules = fsm.CreateRuleset(
 	newTransition(front.TOrderStateNopay, front.TOrderStatePaid),
 	newTransition(front.TOrderStateNopay, front.TOrderStateCanceled),
 
+	newTransition(front.TOrderStatePrepaid, front.TOrderStatePrepaid),
 	newTransition(front.TOrderStatePrepaid, front.TOrderStatePaid),
 	newTransition(front.TOrderStatePrepaid, front.TOrderStateCanceled),
 
