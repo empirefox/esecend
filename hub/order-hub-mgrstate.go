@@ -12,7 +12,7 @@ type orderMgrStateInput struct {
 	chanErr <-chan error
 }
 
-func (hub *OrderHub) OrderChangeState(
+func (hub *OrderHub) MgrOrderState(
 	order *front.Order, claims *admin.Claims,
 ) (err error) {
 	chanErr := make(chan error)
@@ -23,7 +23,7 @@ func (hub *OrderHub) OrderChangeState(
 	return
 }
 
-func (hub *OrderHub) onOrderChangeState(in *orderMgrStateInput) {
+func (hub *OrderHub) onMgrOrderState(in *orderMgrStateInput) {
 	in.chanErr <- hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
 		err = tx.MgrOrderState(in.order, in.claims)
 		return

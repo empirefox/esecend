@@ -106,15 +106,7 @@ func (s *Server) GetPaidOrder(c *gin.Context) {
 	}
 
 	tokUsr := s.TokenUser(c)
-
-	var order *front.Order
-	err := s.LockOrderTx(tokUsr.ID, uint(id), func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		order, err = tx.GetBareOrder(tokUsr, uint(id))
-		if err != nil {
-			return
-		}
-		return s.WxClient.UpdateWxOrderSate(tokUsr, tx, order)
-	})
+	order, err := s.OrderHub.OrderPaidState(tokUsr, uint(id))
 	if Abort(c, err) {
 		return
 	}

@@ -902,6 +902,19 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order) (err
 	return
 }
 
+func (dbs *DbService) OrderPaidState(tokUsr *models.User, orderId uint) (order *front.Order, err error) {
+	order, err = dbs.GetBareOrder(tokUsr, orderId)
+	if err != nil {
+		return
+	}
+	var src map[string]string
+	src, err = dbs.wc.OrderQuery(order)
+	if err != nil {
+		return
+	}
+	return order, dbs.UpdateWxOrderSate(order, src)
+}
+
 func (dbs *DbService) UpdateWxOrderSate(order *front.Order, src map[string]string) (err error) {
 	tradeState := front.TradeStateNameToValue[src["trade_state"]]
 	tid := src["transaction_id"]
