@@ -81,6 +81,7 @@ const (
 	ApiImplementFailed
 	WxUserAbnormal
 	ParseWxTotalFeeFailed
+	WithdrawFailed
 
 	VipRebateSubIDsLen
 	VipRebateSubIDsHas0

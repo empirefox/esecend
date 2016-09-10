@@ -7,6 +7,7 @@ import (
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/esecend/wx"
+	"github.com/golang/glog"
 	"gopkg.in/doug-martin/goqu.v3"
 	"gopkg.in/reform.v1"
 )
@@ -42,9 +43,9 @@ func (dbs *DbService) UserSetPaykey(id uint, paykey []byte) error {
 	return dbs.GetDB().UpdateColumns(&data, "Paykey")
 }
 
-func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawPayload) error {
+func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawPayload) (*front.UserCash, error) {
 	if payload.Amount < 100 {
-		return cerr.AmountLimit
+		return nil, cerr.AmountLimit
 	}
 
 	db := dbs.GetDB()
@@ -52,11 +53,11 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 	var top front.UserCash
 	ds := dbs.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID)).Order(goqu.I("$CreatedAt").Desc())
 	if err := db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
-		return err
+		return nil, err
 	}
 
 	if top.Balance < int(payload.Amount) {
-		return cerr.NotEnoughMoney
+		return nil, cerr.NotEnoughMoney
 	}
 
 	now := time.Now().Unix()
@@ -70,12 +71,10 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 	}
 	err := db.Insert(cash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// TODO split here and back to user goroutine with data
-
-	data := wx.TransfersArgs{
+	data := &wx.TransfersArgs{
 		TradeNo: cash.TrackingNumber(),
 		OpenID:  tokUsr.OpenId,
 		Amount:  payload.Amount,
@@ -83,6 +82,14 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 		Ip:      payload.Ip,
 	}
 
-	// then next chan
-	return nil
+	result, err := dbs.wc.Transfers(data)
+	if err != nil {
+		return nil, err
+	}
+	if result["result_code"] != "SUCCESS" {
+		glog.Errorln(result["err_code"])
+		return nil, cerr.WithdrawFailed
+	}
+
+	return &cash, nil
 }
