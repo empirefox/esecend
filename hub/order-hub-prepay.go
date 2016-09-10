@@ -34,7 +34,7 @@ func (hub *OrderHub) PrepayOrder(tokUsr *models.User, orderId uint, cip string) 
 	return
 }
 
-func (hub *OrderHub) onPrepayOrder(tx *dbsrv.DbService, in *prepayOrderInput) {
+func (hub *OrderHub) onPrepayOrder(in *prepayOrderInput) {
 	var order *front.Order
 	var args *front.WxPayArgs
 	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {

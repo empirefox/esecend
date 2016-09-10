@@ -92,9 +92,7 @@ func (s *Server) PostOrderState(c *gin.Context) {
 	tokUsr := s.TokenUser(c)
 
 	var order front.Order
-	err := s.LockOrderTx(tokUsr.ID, payload.ID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		return tx.OrderChangeState(&order, tokUsr, &payload, s.WxClient)
-	})
+	err := s.OrderHub.OrderChangeState(&order, tokUsr, &payload)
 	if Abort(c, err) {
 		return
 	}

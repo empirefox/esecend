@@ -670,7 +670,6 @@ func (dbs *DbService) OrderChangeState(
 
 	db := dbs.GetDB()
 
-	// lock order before tx
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(payload.ID)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
 	err = db.DsSelectOneTo(order, ds)
 	if err != nil {
@@ -692,14 +691,6 @@ func (dbs *DbService) OrderChangeState(
 			err = db.UpdateColumns(order, "CanceledAt", "State")
 			return
 		case front.TOrderStatePrepaid:
-			order.State = front.TOrderStateCanceled
-			order.CanceledAt = now
-			err = db.UpdateColumns(order, "CanceledAt", "State")
-			if err != nil {
-				return
-			}
-
-			// TOrderStatePrepaid indecate there must be an incompleted wx order
 			var res map[string]string
 			res, err = dbs.wc.OrderClose(order)
 			if err != nil {
@@ -716,6 +707,13 @@ func (dbs *DbService) OrderChangeState(
 					err = cerr.ApiImplementFailed
 				}
 			}
+			if err != nil {
+				return
+			}
+
+			order.State = front.TOrderStateCanceled
+			order.CanceledAt = now
+			err = db.UpdateColumns(order, "CanceledAt", "State")
 			return
 
 		case front.TOrderStatePaid, front.TOrderStatePicking:

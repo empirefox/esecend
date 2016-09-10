@@ -11,9 +11,9 @@ func (hub *OrderHub) Run() {
 	for input := range hub.chanInput {
 		switch in := input.(type) {
 		case *prepayOrderInput:
-			hub.onPrepayOrder(tx, in)
+			hub.onPrepayOrder(in)
 		case *payOrderInput:
-			hub.onPayOrder(tx, in)
+			hub.onPayOrder(in)
 		}
 	}
 }
