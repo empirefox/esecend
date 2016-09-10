@@ -26,7 +26,7 @@ func (hub *OrderHub) OrderChangeState(
 
 func (hub *OrderHub) onOrderChangeState(in *orderChangeStateInput) {
 	in.chanErr <- hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
-		err = tx.PayOrder(in.order, in.tokUsr, in.payload)
+		err = tx.OrderChangeState(in.order, in.tokUsr, in.payload)
 		return
 	})
 }

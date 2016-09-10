@@ -774,7 +774,7 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (e
 		return
 	}
 
-	var refundCol string
+	var refundCol string // need refund
 	now := time.Now().Unix()
 	switch claims.State {
 	case front.TOrderStatePicking:
@@ -820,14 +820,16 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (e
 		return
 	}
 
+	// refund
 	order.CashRefund = claims.CashRefund
 	order.WxRefund = claims.WxRefund
 
 	err = dbs.orderRefund(claims.AdminId, claims.UserId, order)
 	if err == nil {
-		err = db.UpdateColumns(order, refundCol, "State", "WxRefundID")
+		err = db.UpdateColumns(order, refundCol, "CashRefund", "WxRefund", "State", "WxRefundID")
+	} else {
+		glog.Errorln(err)
 	}
-	glog.Errorln(err)
 	return
 }
 
