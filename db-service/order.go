@@ -740,7 +740,14 @@ func (dbs *DbService) OrderChangeState(
 		}
 		order.State = front.TOrderStateCompleted
 		order.CompletedAt = now
-		err = db.UpdateColumns(order, "CompletedAt", "State")
+
+		// TODO prove it!
+		var cols []string
+		cols, err = dbs.OrderMaintanence(order)
+		if err != nil {
+			return
+		}
+		err = db.UpdateColumns(order, append(cols, "CompletedAt", "State")...)
 		return
 
 	case front.TOrderStateReturnStarted:

@@ -12,7 +12,8 @@ import (
 func (dbs *DbService) EvalSave(
 	order *front.Order, ra *uint, tokUsr *models.User, orderId, itemId uint, payload *front.EvalItem,
 ) error {
-	db := tx.GetDB()
+
+	db := dbs.GetDB()
 
 	ds := dbs.DS.Where(goqu.I(front.OrderTable.PK()).Eq(orderId)).Where(goqu.I("$UserID").Eq(tokUsr.ID))
 	err := db.DsSelectOneTo(order, ds)
@@ -60,17 +61,30 @@ func (dbs *DbService) EvalSave(
 		if evalOrder {
 			order.State = front.TOrderStateEvaled
 			order.EvalAt = payload.EvalAt
-			cols = append(cols, "State", "EvalAt")
+			cols = append(cols, "EvalAt")
 		}
 		if evalStarted {
 			order.EvalStartedAt = payload.EvalAt
 			cols = append(cols, "EvalStartedAt")
 			if order.State != front.TOrderStateEvaled {
 				order.State = front.TOrderStateEvalStarted
-				cols = append(cols, "State")
 			}
 		}
-		return db.UpdateColumns(order, cols...)
+		if order.CompletedAt == 0 {
+			order.CompletedAt = order.DeliveredAt + int64(dbs.config.Order.CompleteTimeoutDay)*DaySeconds
+			if order.CompletedAt > payload.EvalAt {
+				order.CompletedAt = payload.EvalAt
+			}
+			cols = append(cols, "CompletedAt")
+
+			// TODO prove it
+			cols2, err := dbs.OrderMaintanence(order)
+			if err != nil {
+				return err
+			}
+			cols = append(cols, cols2...)
+		}
+		return db.UpdateColumns(order, append(cols, "State")...)
 	}
 	return nil
 }

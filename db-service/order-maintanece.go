@@ -33,39 +33,63 @@ func (dbs *DbService) OrdersMaintanence() error {
 	}
 	for _, iorder := range orders {
 		order := iorder.(*front.Order)
-		if _, err = dbs.OrderMaintanence(*order); err != nil {
+		cols, err := dbs.OrderMaintanence(order)
+		if err != nil {
 			return err
+		}
+		if len(cols) != 0 {
+			if err = dbs.GetDB().UpdateColumns(order, append(cols, "State")...); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order, err error) {
+// exclude State
+func (dbs *DbService) OrderMaintanence(order *front.Order) (cols []string, err error) {
+	if order.PayPoints != 0 {
+		return
+	}
+
 	db := dbs.GetDB()
 	tnow := time.Now()
 	now := tnow.Unix()
 
-	var cols []string
-
-	if dbs.IsOrderAutoCompletedUnsaved(&order) {
-		order.AutoCompleted = true
+	if dbs.IsOrderAutoCompletedUnsaved(order) {
 		order.CompletedAt = order.DeliveredAt + int64(dbs.config.Order.CompleteTimeoutDay)*DaySeconds
+		if order.EvalStartedAt != 0 && order.EvalStartedAt < order.CompletedAt {
+			order.CompletedAt = order.EvalStartedAt
+		} else if order.EvalAt != 0 && order.EvalAt < order.CompletedAt {
+			order.CompletedAt = order.EvalAt
+		} else {
+			order.AutoCompleted = true
+		}
 		order.State = front.TOrderStateCompleted
-		cols = append(cols, "AutoCompleted", "CompletedAt", "State")
+		cols = append(cols, "AutoCompleted", "CompletedAt")
 	}
-	if dbs.IsOrderAutoEvaledUnsaved(&order) {
+	if dbs.IsOrderAutoEvaledUnsaved(order) {
+		if order.CompletedAt == 0 {
+			order.CompletedAt = order.DeliveredAt + int64(dbs.config.Order.CompleteTimeoutDay)*DaySeconds
+			if order.CompletedAt > order.EvalAt {
+				order.CompletedAt = order.EvalAt
+			}
+			cols = append(cols, "CompletedAt")
+		}
 		order.AutoEvaled = true
 		order.EvalAt = order.CompletedAt + int64(dbs.config.Order.EvalTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateEvaled
-		cols = append(cols, "AutoEvaled", "EvalAt", "State")
+		cols = append(cols, "AutoEvaled", "EvalAt")
 	}
-	if dbs.IsOrderHistoryUnsaved(&order) {
+	if dbs.IsOrderHistoryUnsaved(order) {
 		order.HistoryAt = order.EvalAt + int64(dbs.config.Order.HistoryTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateHistory
-		cols = append(cols, "HistoryAt", "State")
+		cols = append(cols, "HistoryAt")
+		if order.EvalAt == 0 {
+		}
 	}
 
-	items, err1 := dbs.GetOrderItems(&order)
+	items, err1 := dbs.GetOrderItems(order)
 	if err1 != nil {
 		err = err1
 		return
@@ -318,18 +342,13 @@ func (dbs *DbService) OrderMaintanence(order front.Order) (changed *front.Order,
 		}
 	}
 
-	if len(cols) != 0 {
-		if err = db.UpdateColumns(&order, cols...); err == nil {
-			changed = &order
-		}
-	}
-	return
+	return cols, nil
 }
 
 // OrderCompleted
 func (dbs *DbService) IsOrderCompleted(order *front.Order) bool {
-	return order.DeliveredAt != 0 && (order.HistoryAt != 0 ||
-		order.CompletedAt != 0 || order.EvalStartedAt != 0 || order.EvalAt != 0 ||
+	return order.DeliveredAt != 0 && (order.CompletedAt != 0 ||
+		order.HistoryAt != 0 || order.EvalStartedAt != 0 || order.EvalAt != 0 ||
 		time.Now().Unix()-order.DeliveredAt > int64(dbs.config.Order.CompleteTimeoutDay)*DaySeconds)
 }
 
@@ -341,7 +360,7 @@ func (dbs *DbService) IsOrderAutoCompletedUnsaved(order *front.Order) bool {
 // OrderEvaled
 func (dbs *DbService) IsOrderEvaled(order *front.Order) bool {
 	return order.DeliveredAt != 0 &&
-		(order.HistoryAt != 0 || order.EvalAt != 0 || dbs.isOrderAutoEvaledUnsaved(order))
+		(order.EvalAt != 0 || order.HistoryAt != 0 || dbs.isOrderAutoEvaledUnsaved(order))
 }
 
 func (dbs *DbService) IsOrderAutoEvaledUnsaved(order *front.Order) bool {
