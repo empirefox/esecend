@@ -5,9 +5,7 @@ import (
 	"strconv"
 
 	"github.com/empirefox/esecend/cerr"
-	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
-	"github.com/empirefox/esecend/lok"
 	"github.com/gin-gonic/gin"
 )
 
@@ -127,27 +125,4 @@ func (s *Server) GetOrder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, data)
-}
-
-func (s *Server) LockOrderTx(userId, orderId uint, inTx func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error)) (err error) {
-	if !lok.OrderLok.Lock(orderId) {
-		err = cerr.OrderTmpLocked
-		return
-	}
-
-	var cashLocked, pointsLocked bool
-	defer func() {
-		if cashLocked {
-			lok.CashLok.Unlock(userId)
-		}
-		if pointsLocked {
-			lok.PointsLok.Unlock(userId)
-		}
-		lok.OrderLok.Unlock(orderId)
-	}()
-
-	return s.DB.InTx(func(tx *dbsrv.DbService) (err error) {
-		cashLocked, pointsLocked, err = inTx(tx)
-		return
-	})
 }
