@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
@@ -21,12 +22,37 @@ func (s *Server) PostEval(c *gin.Context) {
 		return
 	}
 
+	tokUsr := s.TokenUser(c)
+	name := []rune(tokUsr.Nickname)
+	switch l := len(name); l {
+	case 1:
+	case 2:
+		name[1] = '*'
+	case 3:
+		name[1] = '*'
+		name[2] = '*'
+	default:
+		for i := 1; i < l-1; i++ {
+			name[i] = '*'
+		}
+	}
+
+	payload.EvalName = string(name)
+	payload.EvalAt = time.Now().Unix()
+
 	itemId, _ := strconv.ParseUint(c.Query("item"), 10, 64)
 
-	data, err := s.DB.EvalSave(s.TokenUser(c), uint(id), uint(itemId), &payload)
+	var order front.Order
+	var ra uint
+	err := s.OrderHub.EvalSave(&order, &ra, tokUsr, uint(id), itemId, payload)
 	if Abort(c, err) {
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, &front.EvalResponse{
+		Order:    &order,
+		Evaled:   ra,
+		EvalAt:   payload.EvalAt,
+		EvalName: payload.EvalName,
+	})
 }
