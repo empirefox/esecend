@@ -73,9 +73,7 @@ func (s *Server) GetMgrOrderState(c *gin.Context) {
 	claims := s.AdminClaims(c)
 
 	var order front.Order
-	err := s.LockOrderTx(claims.UserId, claims.OrderID, func(tx *dbsrv.DbService) (cashLocked, pointsLocked bool, err error) {
-		return tx.MgrOrderState(&order, claims, s.WxClient)
-	})
+	err := s.OrderHub.MgrOrderState(&order, claims)
 	if Abort(c, err) {
 		return
 	}
