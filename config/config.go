@@ -26,6 +26,7 @@ type Order struct {
 	WxPayExpiresMinute    time.Duration
 	Point2Cent            uint
 	FreeDeliverLine       uint
+	MaintaneTimeMinute    uint
 }
 
 type Money struct {
