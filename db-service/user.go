@@ -3,13 +3,14 @@ package dbsrv
 import (
 	"time"
 
+	"gopkg.in/doug-martin/goqu.v3"
+
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/esecend/wx"
+	"github.com/empirefox/reform"
 	"github.com/golang/glog"
-	"gopkg.in/doug-martin/goqu.v3"
-	"gopkg.in/reform.v1"
 )
 
 func (dbs *DbService) FindUserByPhone(phone string) (*models.User, error) {

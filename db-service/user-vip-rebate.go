@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
-	"gopkg.in/reform.v1"
 
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
+	"github.com/empirefox/reform"
 )
 
 func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebateRequest) error {

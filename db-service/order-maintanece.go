@@ -85,8 +85,6 @@ func (dbs *DbService) OrderMaintanence(order *front.Order) (cols []string, err e
 		order.HistoryAt = order.EvalAt + int64(dbs.config.Order.HistoryTimeoutDay)*DaySeconds
 		order.State = front.TOrderStateHistory
 		cols = append(cols, "HistoryAt")
-		if order.EvalAt == 0 {
-		}
 	}
 
 	items, err1 := dbs.GetOrderItems(order)

@@ -4,10 +4,11 @@ import (
 	"os"
 	"time"
 
+	"gopkg.in/doug-martin/goqu.v3"
+
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/reform"
-	"gopkg.in/doug-martin/goqu.v3"
 )
 
 func (dbs *DbService) WishlistSave(userId uint, payload *front.WishlistSavePayload) (*front.WishItem, error) {
