@@ -6,10 +6,9 @@ import (
 
 	"gopkg.in/doug-martin/goqu.v3"
 
-	"github.com/empirefox/reform"
-
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
+	"github.com/empirefox/reform"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,6 +41,26 @@ func (s *Server) GetTableAll(view reform.View) gin.HandlerFunc {
 		data, err := s.DB.GetDB().SelectAllFrom(view, "")
 		ResponseArray(c, data, err)
 	}
+}
+
+func (s *Server) GetMyFans(c *gin.Context) {
+	db := s.DB.GetDB()
+	tokUsr := s.TokenUser(c)
+
+	stores, err := db.FindAllFrom(front.StoreTable, "$User1", tokUsr.ID)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	fans, err := db.FindAllFrom(front.MyFanTable, "$User1", tokUsr.ID)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, &front.MyFansResponse{
+		Stores: stores,
+		Fans:   fans,
+	})
 }
 
 func (s *Server) GetEvals(c *gin.Context) {

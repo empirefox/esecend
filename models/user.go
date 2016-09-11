@@ -20,14 +20,12 @@ type User struct {
 	Privilege string `reform:"privilege"`
 	Phone     string `reform:"phone"`
 	User1     uint   `reform:"parent_id"` // TODO add support to login
-	VipAt     int64  `reform:"vip_at"`
-	NextVipAt int64  `reform:"next_vip_at"`
 
 	CreatedAt int64 `reform:"create_date"`
 	UpdatedAt int64 `reform:"update_date"`
 	SigninAt  int64 `reform:"last_login"`
 
-	//	front.UserInfo
+	// front.UserInfo
 	Nickname     string `reform:"name"`
 	Sex          int    `reform:"sex"`
 	City         string `reform:"city"`

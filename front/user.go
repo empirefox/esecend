@@ -3,12 +3,6 @@ package front
 
 import "github.com/dgrijalva/jwt-go"
 
-//reform:cc_member_level
-type UserLevel struct {
-	ID   uint   `reform:"id,pk"`
-	Name string `reform:"name"`
-}
-
 type UserInfo struct {
 	Nickname     string
 	Sex          int
