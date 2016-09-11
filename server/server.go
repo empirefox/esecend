@@ -67,11 +67,12 @@ func (s *Server) BuildEngine() error {
 	router.GET("/product/attrs", s.GetProductAttrs)
 	router.GET("/groupbuy", s.GetGroupBuy)
 
-	// TODO add my users, my qualifications, vip info
+	// TODO set/get vip info
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
 	router.GET("/myfans", auth, mustAuthed, s.GetMyFans)
+	router.GET("/myqualifications", auth, mustAuthed, s.GetMyQualifications)
 	router.POST("/rebate", auth, mustAuthed, s.PostUserRebate)
 	router.POST("/withdraw", auth, mustAuthed, s.PostUserWithdraw)
 	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)

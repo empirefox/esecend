@@ -63,6 +63,19 @@ func (s *Server) GetMyFans(c *gin.Context) {
 	})
 }
 
+// front-end needs to filter not activated
+func (s *Server) GetMyQualifications(c *gin.Context) {
+	db := s.DB.GetDB()
+	tokUsr := s.TokenUser(c)
+
+	vips, err := db.FindAllFrom(front.VipRebateOriginTable, "$User1", tokUsr.ID)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, vips)
+}
+
 func (s *Server) GetEvals(c *gin.Context) {
 	productId, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 	if productId == 0 {

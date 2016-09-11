@@ -4,7 +4,7 @@ package front
 //reform:cc_vip_rebate_origin
 type VipRebateOrigin struct {
 	ID        uint  `reform:"id,pk"`
-	UserID    uint  `reform:"user_id"`
+	UserID    uint  `reform:"user_id" json:"-"`
 	CreatedAt int64 `reform:"created_at"`
 	NotBefore int64 `reform:"nbf"`
 	ExpiresAt int64 `reform:"exp"`
