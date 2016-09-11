@@ -26,7 +26,7 @@ var (
 )
 
 type SecurityHandler interface {
-	Login(userinfo *mpoauth2.UserInfo) (ret interface{}, err error)
+	Login(userinfo *mpoauth2.UserInfo, user1 uint) (ret interface{}, err error)
 	ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interface{}, err error)
 }
 
@@ -121,7 +121,8 @@ func (a *Auther) authHandle(c *gin.Context) error {
 		return err
 	}
 
-	ret, err := a.secHandler.Login(userinfo)
+	user1, _ := jsonparser.GetInt(raw, "user1")
+	ret, err := a.secHandler.Login(userinfo, uint(user1))
 	if err != nil {
 		return err
 	}

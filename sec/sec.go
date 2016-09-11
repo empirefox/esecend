@@ -39,7 +39,7 @@ func NewHandler(config *config.Config, db *dbsrv.DbService) *Handler {
 	}
 }
 
-func (h *Handler) Login(userinfo *mpoauth2.UserInfo) (interface{}, error) {
+func (h *Handler) Login(userinfo *mpoauth2.UserInfo, user1 uint) (interface{}, error) {
 	var usr models.User
 	var err error
 	var refreshToken = uniuri.NewLen(32)
@@ -69,6 +69,7 @@ func (h *Handler) Login(userinfo *mpoauth2.UserInfo) (interface{}, error) {
 			City:         userinfo.City,
 			Province:     userinfo.Province,
 			HeadImageURL: userinfo.HeadImageURL, // TODO Save to our cdn
+			User1:        user1,
 		}
 		err = db.Insert(&usr)
 	} else if err == nil {

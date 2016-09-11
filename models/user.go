@@ -19,7 +19,7 @@ type User struct {
 	OpenId    string `reform:"open_id"`
 	Privilege string `reform:"privilege"`
 	Phone     string `reform:"phone"`
-	User1     uint   `reform:"parent_id"` // TODO add support to login
+	User1     uint   `reform:"parent_id"`
 
 	CreatedAt int64 `reform:"create_date"`
 	UpdatedAt int64 `reform:"update_date"`
