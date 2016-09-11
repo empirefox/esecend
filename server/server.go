@@ -68,7 +68,6 @@ func (s *Server) BuildEngine() error {
 	router.GET("/groupbuy", s.GetGroupBuy)
 	router.GET("/vips", s.GetVipIntros)
 
-	// TODO set vip info
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
@@ -76,6 +75,7 @@ func (s *Server) BuildEngine() error {
 	router.GET("/myqualifications", auth, mustAuthed, s.GetMyQualifications)
 	router.POST("/rebate", auth, mustAuthed, s.PostUserRebate)
 	router.POST("/withdraw", auth, mustAuthed, s.PostUserWithdraw)
+	router.POST("/set_user_info", auth, mustAuthed, s.PostSetUserInfo)
 	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)
 	router.POST("/phone/bind", auth, mustAuthed, s.PostBindPhone)
 	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)

@@ -31,6 +31,7 @@ type User struct {
 	City         string `reform:"city"`
 	Province     string `reform:"province"`
 	HeadImageURL string `reform:"avatar"`
+	Birthday     int64  `reform:"birthday"`
 
 	Intro string `reform:"intro"`
 

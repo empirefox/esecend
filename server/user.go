@@ -4,15 +4,34 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/empirefox/reform"
-
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/esecend/sms"
 	"github.com/empirefox/esecend/utils"
+	"github.com/empirefox/reform"
 	"github.com/gin-gonic/gin"
 )
+
+func (s *Server) PostSetUserInfo(c *gin.Context) {
+	var payload front.SetUserInfoPayload
+	if err := c.BindJSON(&payload); Abort(c, err) {
+		return
+	}
+
+	if payload.Key == "" || payload.Value == "" {
+		front.NewCodev(cerr.InvalidPostBody).Abort(c, http.StatusBadRequest)
+		return
+	}
+
+	tokUsr := s.TokenUser(c)
+	err := s.DB.UserSetInfo(tokUsr.ID, &payload)
+	if Abort(c, err) {
+		return
+	}
+
+	c.AbortWithStatus(http.StatusOK)
+}
 
 func (s *Server) PostSetPaykey(c *gin.Context) {
 	var payload front.SetPaykeyPayload

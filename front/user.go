@@ -9,6 +9,7 @@ type UserInfo struct {
 	City         string
 	Province     string
 	HeadImageURL string
+	Birthday     int64
 	HasPayKey    bool
 }
 
@@ -26,6 +27,11 @@ type TokenClaims struct {
 	Privilege string `json:"pvl,omitempty"`
 	Phone     string `json:"mob,omitempty"`
 	Nonce     string `json:"non,omitempty"`
+}
+
+type SetUserInfoPayload struct {
+	Key   string
+	Value string
 }
 
 type PreBindPhonePayload struct {

@@ -48,7 +48,7 @@ func (s *Server) GetVipIntros(c *gin.Context) {
 	now := time.Now().Unix()
 	db := s.DB.GetDB()
 
-	ds := dbs.DS.Where(goqu.I("$ExpiresAt").Gt(now), goqu.I("$NotBefore").Lte(now))
+	ds := s.DB.DS.Where(goqu.I("$ExpiresAt").Gt(now), goqu.I("$NotBefore").Lte(now))
 	vips, err := db.DsSelectAllFrom(front.VipRebateOriginTable, ds)
 	if AbortWithoutNoRecord(c, err) {
 		return
@@ -61,7 +61,7 @@ func (s *Server) GetVipIntros(c *gin.Context) {
 			ids = append(ids, vip.(*front.VipRebateOrigin).UserID)
 		}
 
-		intros, err := db.FindAllFromPK(front.VipIntroTable, ids...)
+		intros, err = db.FindAllFromPK(front.VipIntroTable, ids...)
 		if AbortWithoutNoRecord(c, err) {
 			return
 		}
