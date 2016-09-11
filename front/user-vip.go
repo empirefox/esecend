@@ -1,6 +1,15 @@
 //go:generate reform
 package front
 
+//reform:cc_member
+type VipIntro struct {
+	ID           uint   `reform:"id,pk"`
+	CreatedAt    int64  `reform:"create_date"`
+	Nickname     string `reform:"name"`
+	HeadImageURL string `reform:"avatar"`
+	Intro        string `reform:"intro"`
+}
+
 //reform:cc_vip_rebate_origin
 type VipRebateOrigin struct {
 	ID        uint  `reform:"id,pk"`

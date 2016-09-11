@@ -32,6 +32,8 @@ type User struct {
 	Province     string `reform:"province"`
 	HeadImageURL string `reform:"avatar"`
 
+	Intro string `reform:"intro"`
+
 	UnionId string `reform:"union_id"`
 
 	// for jwt, auto generated when

@@ -3,7 +3,7 @@ package front
 
 import "github.com/empirefox/reform"
 
-//reform:cc_my_fan
+//reform:cc_member
 type MyFan struct {
 	ID           uint   `reform:"id,pk"`
 	CreatedAt    int64  `reform:"create_date"`

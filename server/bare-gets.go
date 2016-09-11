@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
 
@@ -41,6 +42,32 @@ func (s *Server) GetTableAll(view reform.View) gin.HandlerFunc {
 		data, err := s.DB.GetDB().SelectAllFrom(view, "")
 		ResponseArray(c, data, err)
 	}
+}
+
+func (s *Server) GetVipIntros(c *gin.Context) {
+	now := time.Now().Unix()
+	db := s.DB.GetDB()
+
+	ds := dbs.DS.Where(goqu.I("$ExpiresAt").Gt(now), goqu.I("$NotBefore").Lte(now))
+	vips, err := db.DsSelectAllFrom(front.VipRebateOriginTable, ds)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	var intros []reform.Struct
+	if len(vips) > 0 {
+		var ids []interface{}
+		for _, vip := range vips {
+			ids = append(ids, vip.(*front.VipRebateOrigin).UserID)
+		}
+
+		intros, err := db.FindAllFromPK(front.VipIntroTable, ids...)
+		if AbortWithoutNoRecord(c, err) {
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, intros)
 }
 
 func (s *Server) GetMyFans(c *gin.Context) {

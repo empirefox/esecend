@@ -67,7 +67,7 @@ func (s *Server) BuildEngine() error {
 	router.GET("/product/attrs", s.GetProductAttrs)
 	router.GET("/groupbuy", s.GetGroupBuy)
 
-	// TODO set/get vip info
+	// TODO set vip info
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
