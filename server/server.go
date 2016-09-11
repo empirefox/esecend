@@ -70,6 +70,8 @@ func (s *Server) BuildEngine() error {
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
+	router.POST("/rebate", auth, mustAuthed, s.PostUserRebate)
+	router.POST("/withdraw", auth, mustAuthed, s.PostUserWithdraw)
 	router.POST("/phone/prebind", auth, mustAuthed, s.PostPreBindPhone)
 	router.POST("/phone/bind", auth, mustAuthed, s.PostBindPhone)
 	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)

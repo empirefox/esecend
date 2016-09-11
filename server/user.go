@@ -177,3 +177,32 @@ func (s *Server) PostPreBindPhone(c *gin.Context) {
 
 	c.AbortWithStatus(http.StatusOK)
 }
+
+func (s *Server) PostUserRebate(c *gin.Context) {
+	var payload front.VipRebateRequest
+	if err := c.BindJSON(&payload); Abort(c, err) {
+		return
+	}
+
+	tokUsr := s.TokenUser(c)
+	if err := s.OrderHub.UserVipRebate(tokUsr, &payload); Abort(c, err) {
+		return
+	}
+
+	c.AbortWithStatus(http.StatusOK)
+}
+
+func (s *Server) PostUserWithdraw(c *gin.Context) {
+	var payload front.WithdrawPayload
+	if err := c.BindJSON(&payload); Abort(c, err) {
+		return
+	}
+	payload.Ip = c.ClientIP()
+
+	tokUsr := s.TokenUser(c)
+	if err := s.OrderHub.UserWithdraw(tokUsr, &payload); Abort(c, err) {
+		return
+	}
+
+	c.AbortWithStatus(http.StatusOK)
+}
