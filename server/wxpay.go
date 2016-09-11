@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/empirefox/esecend/wx"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,18 +19,18 @@ func (s *Server) PostWxPayNotify(c *gin.Context) {
 
 	var at int64
 	var id uint
-	_, err := fmt.Sscanf(m["out_trade_no"], "%d-%d", &at, &id)
+	_, err := fmt.Sscanf(src["out_trade_no"], "%d-%d", &at, &id)
 	if err != nil {
-		c.XML(http.StatusOK, NewWxResponse("FAIL", "failed to parse out_trade_no"))
+		c.XML(http.StatusOK, wx.NewWxResponse("FAIL", "failed to parse out_trade_no"))
 		return
 	}
 
 	err = s.OrderHub.OnWxPayNotify(src, id)
 	// must trans to WxReponse
 	if err != nil {
-		res = NewWxResponse("FAIL", "failed to update trade state")
+		res = wx.NewWxResponse("FAIL", "failed to update trade state")
 	} else {
-		res = NewWxResponse("SUCCESS", "")
+		res = wx.NewWxResponse("SUCCESS", "")
 	}
 
 	c.XML(http.StatusOK, res)

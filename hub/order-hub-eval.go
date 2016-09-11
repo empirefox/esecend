@@ -13,7 +13,7 @@ type orderEvalInput struct {
 	orderId uint
 	itemId  uint
 	payload *front.EvalItem
-	chanErr <-chan error
+	chanErr chan<- error
 }
 
 func (hub *OrderHub) EvalSave(
@@ -29,7 +29,7 @@ func (hub *OrderHub) EvalSave(
 
 func (hub *OrderHub) onEvalSave(in *orderEvalInput) {
 	in.chanErr <- hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
-		err = tx.EvalSave(order, ra, tokUsr, orderId, itemId, payload)
+		err = tx.EvalSave(in.order, in.ra, in.tokUsr, in.orderId, in.itemId, in.payload)
 		return
 	})
 }

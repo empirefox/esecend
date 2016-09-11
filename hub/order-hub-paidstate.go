@@ -9,8 +9,8 @@ import (
 type orderPaidStateInput struct {
 	tokUsr    *models.User
 	orderId   uint
-	chanOrder <-chan *front.Order
-	chanErr   <-chan error
+	chanOrder chan *front.Order
+	chanErr   chan error
 }
 
 func (hub *OrderHub) OrderPaidState(tokUsr *models.User, orderId uint) (order *front.Order, err error) {
@@ -35,6 +35,6 @@ func (hub *OrderHub) onOrderPaidState(in *orderPaidStateInput) {
 	if err != nil {
 		in.chanErr <- err
 	} else {
-		in.chanResult <- order
+		in.chanOrder <- order
 	}
 }

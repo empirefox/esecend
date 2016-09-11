@@ -6,7 +6,7 @@ import (
 )
 
 func (hub *OrderHub) onOrderMaintanece() {
-	err := hub.dbs.IsOrderCompleted(func(tx *dbsrv.DbService) (err error) {
+	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
 		err = tx.OrdersMaintanence()
 		return
 	})

@@ -29,7 +29,6 @@ type TokenClaims struct {
 	jwt.StandardClaims
 	OpenId    string `json:"oid,omitempty"`
 	UserId    uint   `json:"uid,omitempty"`
-	LevelID   uint   `json:"lid,omitempty"`
 	Privilege string `json:"pvl,omitempty"`
 	Phone     string `json:"mob,omitempty"`
 	Nonce     string `json:"non,omitempty"`

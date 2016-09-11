@@ -44,7 +44,7 @@ func (s *Server) PostEval(c *gin.Context) {
 
 	var order front.Order
 	var ra uint
-	err := s.OrderHub.EvalSave(&order, &ra, tokUsr, uint(id), itemId, payload)
+	err := s.OrderHub.EvalSave(&order, &ra, tokUsr, uint(id), uint(itemId), &payload)
 	if Abort(c, err) {
 		return
 	}

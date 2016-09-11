@@ -9,7 +9,7 @@ import (
 type orderMgrStateInput struct {
 	order   *front.Order
 	claims  *admin.Claims
-	chanErr <-chan error
+	chanErr chan error
 }
 
 func (hub *OrderHub) MgrOrderState(

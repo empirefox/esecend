@@ -10,7 +10,7 @@ type orderChangeStateInput struct {
 	order   *front.Order
 	tokUsr  *models.User
 	payload *front.OrderChangeStatePayload
-	chanErr <-chan error
+	chanErr chan<- error
 }
 
 func (hub *OrderHub) OrderChangeState(

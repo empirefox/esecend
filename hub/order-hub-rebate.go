@@ -9,7 +9,7 @@ import (
 type userVipRebateInput struct {
 	tokUsr  *models.User
 	payload *front.VipRebateRequest
-	chanErr <-chan error
+	chanErr chan<- error
 }
 
 func (hub *OrderHub) UserVipRebate(tokUsr *models.User, payload *front.VipRebateRequest) (err error) {

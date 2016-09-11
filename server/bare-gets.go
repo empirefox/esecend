@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"gopkg.in/doug-martin/goqu.v3"
+
 	"github.com/empirefox/reform"
 
 	"github.com/empirefox/esecend/cerr"
@@ -121,18 +123,46 @@ func (s *Server) GetWishlist(c *gin.Context) {
 func (s *Server) GetWallet(c *gin.Context) {
 	db := s.DB.GetDB()
 	tokUsr := s.TokenUser(c)
-	userCashess, err := db.FindAllFrom(front.UserCashTable, "$UserID", tokUsr.ID)
+	cashes, err := db.FindAllFrom(front.UserCashTable, "$UserID", tokUsr.ID)
 	if AbortWithoutNoRecord(c, err) {
 		return
 	}
-	// pointsList, err := db.FindAllFrom(front.PointsItemTable, "$UserID", tokUsr.ID)
-	// if AbortWithoutNoRecord(c, err) {
-	// 	return
-	// }
+
+	ds := s.DB.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID), goqu.I("$ThawedAt").Eq(0))
+	frozen, err := db.DsFindAllFrom(front.UserCashFrozenTable, ds)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	ds = s.DB.DS.Where(goqu.I("$UserID").Eq(tokUsr.ID), goqu.I("$DoneAt").Eq(0))
+	rebates, err := db.DsFindAllFrom(front.UserCashRebateTable, ds)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	var rebateItems []reform.Struct
+	if len(rebates) != 0 {
+		var ids []interface{}
+		for _, rebate := range rebates {
+			ids = append(ids, rebate.(*front.UserCashRebate).ID)
+		}
+		rebateItems, err = db.FindAllFromPK(front.UserCashRebateItemTable, ids...)
+		if AbortWithoutNoRecord(c, err) {
+			return
+		}
+	}
+
+	points, err := db.FindAllFrom(front.PointsItemTable, "$UserID", tokUsr.ID)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
 
 	c.JSON(http.StatusOK, &front.Wallet{
-		UserCashs: userCashess,
-		// PointsList:   pointsList,
+		Cashes:      cashes,
+		Frozen:      frozen,
+		Rebates:     rebates,
+		RebateItems: rebateItems,
+		Points:      points,
 	})
 }
 

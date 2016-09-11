@@ -5,7 +5,7 @@ import "github.com/empirefox/esecend/db-service"
 type orderOnWxPayNotifyInput struct {
 	src     map[string]string
 	orderId uint
-	chanErr <-chan error
+	chanErr chan error
 }
 
 func (hub *OrderHub) OnWxPayNotify(src map[string]string, orderId uint) (err error) {

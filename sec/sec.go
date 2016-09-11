@@ -115,7 +115,6 @@ func (h *Handler) NewTokenWithIat(usr *models.User, now int64) (*string, error) 
 		},
 		OpenId:    usr.OpenId,
 		UserId:    usr.ID,
-		LevelID:   usr.LevelID,
 		Privilege: usr.Privilege,
 		Phone:     usr.Phone,
 		Nonce:     uniuri.NewLen(32),
@@ -193,7 +192,6 @@ func (h *Handler) ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interfac
 	usr := &models.User{
 		OpenId:    claims.OpenId,
 		ID:        claims.UserId,
-		LevelID:   claims.LevelID,
 		Privilege: claims.Privilege,
 		Phone:     claims.Phone,
 	}

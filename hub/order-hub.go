@@ -23,7 +23,7 @@ func NewOrderHub(config *config.Config, dbs *dbsrv.DbService) *OrderHub {
 }
 
 func (hub *OrderHub) Run() {
-	ticker := time.NewTicker(hub.config.MaintaneTimeMinute * time.Minute)
+	ticker := time.NewTicker(time.Duration(hub.config.MaintaneTimeMinute) * time.Minute)
 	defer func() {
 		ticker.Stop()
 	}()

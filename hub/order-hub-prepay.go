@@ -15,8 +15,8 @@ type prepayOrderInput struct {
 	tokUsr     *models.User
 	orderId    uint
 	ip         *string
-	chanResult <-chan *prepayOrderResult
-	chanErr    <-chan error
+	chanResult chan *prepayOrderResult
+	chanErr    chan error
 }
 
 func (hub *OrderHub) PrepayOrder(tokUsr *models.User, orderId uint, cip string) (order *front.Order, args *front.WxPayArgs, err error) {
@@ -39,6 +39,7 @@ func (hub *OrderHub) onPrepayOrder(in *prepayOrderInput) {
 	var args *front.WxPayArgs
 	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
 		order, args, err = tx.PrepayOrder(in.tokUsr, in.orderId, in.ip)
+		return
 	})
 	if err != nil {
 		in.chanErr <- err

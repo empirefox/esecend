@@ -200,9 +200,10 @@ func (s *Server) PostUserWithdraw(c *gin.Context) {
 	payload.Ip = c.ClientIP()
 
 	tokUsr := s.TokenUser(c)
-	if err := s.OrderHub.UserWithdraw(tokUsr, &payload); Abort(c, err) {
+	cash, err := s.OrderHub.UserWithdraw(tokUsr, &payload)
+	if Abort(c, err) {
 		return
 	}
 
-	c.AbortWithStatus(http.StatusOK)
+	c.JSON(http.StatusOK, cash)
 }

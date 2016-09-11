@@ -9,8 +9,8 @@ import (
 type payOrderInput struct {
 	tokUsr    *models.User
 	payload   *front.OrderPayPayload
-	chanOrder <-chan *front.Order
-	chanErr   <-chan error
+	chanOrder chan *front.Order
+	chanErr   chan error
 }
 
 func (hub *OrderHub) PayOrder(tokUsr *models.User, payload *front.OrderPayPayload) (o *front.Order, err error) {
@@ -31,10 +31,11 @@ func (hub *OrderHub) onPayOrder(in *payOrderInput) {
 	var order *front.Order
 	err := hub.dbs.InTx(func(tx *dbsrv.DbService) (err error) {
 		order, err = tx.PayOrder(in.tokUsr, in.payload)
+		return
 	})
 	if err != nil {
 		in.chanErr <- err
 	} else {
-		in.chanResult <- order
+		in.chanOrder <- order
 	}
 }

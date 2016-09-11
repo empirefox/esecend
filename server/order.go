@@ -35,7 +35,7 @@ func (s *Server) PostOrderWxPrepay(c *gin.Context) {
 	}
 
 	tokUsr := s.TokenUser(c)
-	_, args, err := s.OrderHub.PrepayOrder(tokUsr.ID, payload.OrderID, c.ClientIP())
+	_, args, err := s.OrderHub.PrepayOrder(tokUsr, payload.OrderID, c.ClientIP())
 	if Abort(c, err) {
 		return
 	}
@@ -63,8 +63,8 @@ func (s *Server) PostOrderPay(c *gin.Context) {
 		return
 	}
 
-	s.DB.GetOrderItems(&order)
-	c.JSON(http.StatusOK, &order)
+	s.DB.GetOrderItems(order)
+	c.JSON(http.StatusOK, order)
 }
 
 func (s *Server) GetMgrOrderState(c *gin.Context) {
