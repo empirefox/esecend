@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/empirefox/esecend/front"
-	"gopkg.in/doug-martin/goqu.v3"
 )
 
 func (s *DbService) RebateMaintain() error {
 	db := s.GetDB()
 
-	ds := s.DS.Where(goqu.I("$DoneAt").Eq(0))
-	irebates, err := db.DsSelectAllFrom(front.UserCashRebateTable, ds)
+	irebates, err := db.FindAllFrom(front.UserCashRebateTable, "$DoneAt", 0)
 	if err != nil {
 		return err
 	}
