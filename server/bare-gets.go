@@ -14,13 +14,10 @@ import (
 )
 
 func (s *Server) GetProfile(c *gin.Context) {
-	data, err := s.DB.GetDB().SelectOneFrom(front.ProfileView, "LIMIT 1")
-	if Abort(c, err) {
-		return
-	}
+	profile := s.DB.Profile()
 
 	c.JSON(http.StatusOK, &front.ProfileResponse{
-		Profile: data.(*front.Profile),
+		Profile: &profile,
 
 		WxAppId:     s.Config.Weixin.AppId,
 		WxLoginPath: s.Config.Security.WxOauthPath,
@@ -32,7 +29,6 @@ func (s *Server) GetProfile(c *gin.Context) {
 		HistoryTimeoutDay:     s.Config.Order.HistoryTimeoutDay,
 		CheckoutExpiresMinute: s.Config.Order.CheckoutExpiresMinute,
 		WxPayExpiresMinute:    s.Config.Order.WxPayExpiresMinute,
-		Point2Cent:            s.Config.Order.Point2Cent,
 		FreeDeliverLine:       s.Config.Order.FreeDeliverLine,
 	})
 }

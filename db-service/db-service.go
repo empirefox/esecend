@@ -5,9 +5,11 @@ import (
 	"fmt"
 	slog "log"
 	"os"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/empirefox/esecend/config"
+	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/wx"
 	"github.com/empirefox/reform"
 	"github.com/empirefox/reform/dialects/mysql"
@@ -30,6 +32,9 @@ type DbService struct {
 	db      *reform.DB
 	isDebug bool
 	tx      *reform.TX
+
+	profile   front.Profile
+	muProfile sync.RWMutex
 }
 
 func NewDbService(config *config.Config, wc *wx.WxClient, isDebug bool) (*DbService, error) {

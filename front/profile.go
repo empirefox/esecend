@@ -5,9 +5,10 @@ import "time"
 
 //reform:cc_profile
 type Profile struct {
-	SaleFeePercent   uint
-	Phone            string `reform:"phone"`
-	DefaultHeadImage string `reform:"default_head_image"`
+	ID                   uint   `reform:"id,pk"` // always 1
+	Phone                string `reform:"phone"`
+	DefaultHeadImage     string `reform:"default_head_image"`
+	UserCashRebateStages uint   `reform:"user_cash_rebate_stages"`
 }
 
 type ProfileResponse struct {
@@ -22,6 +23,5 @@ type ProfileResponse struct {
 	HistoryTimeoutDay     uint
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
-	Point2Cent            uint
 	FreeDeliverLine       uint
 }

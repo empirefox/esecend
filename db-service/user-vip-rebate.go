@@ -94,6 +94,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			return err
 		}
 
+		profile := dbs.Profile()
 		// rebate
 		err = db.Insert(&front.UserCashRebate{
 			UserID:    tokUsr.ID,
@@ -102,7 +103,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			CreatedAt: now,
 			Type:      front.TUserCashRebate,
 			Amount:    amount,
-			Stages:    dbs.config.Money.UserCashRebateStages,
+			Stages:    profile.UserCashRebateStages,
 			DoneAt:    0,
 		})
 		if err != nil {

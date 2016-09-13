@@ -36,6 +36,10 @@ type Server struct {
 }
 
 func (s *Server) BuildEngine() error {
+	err := s.DB.LoadProfile()
+	if err != nil {
+		return err
+	}
 
 	corsMiddleWare := s.Cors("GET, PUT, POST, DELETE")
 

@@ -24,7 +24,6 @@ type Order struct {
 	HistoryTimeoutDay     uint
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
-	Point2Cent            uint
 	FreeDeliverLine       uint
 	MaintaneTimeMinute    uint
 }
@@ -33,7 +32,6 @@ type Money struct {
 	StoreSaleFeePercent     uint
 	User1RebatePercent      uint
 	Store1RebatePercent     uint
-	UserCashRebateStages    uint
 	RewardFromVipCent       uint
 	RewardFromVipRebateDone uint
 	WithdrawDesc            string
