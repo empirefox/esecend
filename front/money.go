@@ -62,6 +62,7 @@ type UserCashRebate struct {
 	Remark    string       `reform:"remark"`
 	Stages    uint         `reform:"stages"`
 	DoneAt    int64        `reform:"done_at"`
+	Items     []*UserCashRebateItem
 }
 
 //reform:cc_member_credit_log

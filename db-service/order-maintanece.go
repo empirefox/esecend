@@ -15,7 +15,7 @@ const (
 	DaySeconds int64 = 3600 * 24
 )
 
-func (dbs *DbService) OrdersMaintanence() error {
+func (dbs *DbService) OrdersMaintain() error {
 	now := time.Now().Unix()
 	ds := dbs.DS.Where(
 		goqu.I("$DeliveredAt").Gt(0),

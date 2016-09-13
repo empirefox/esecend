@@ -25,7 +25,7 @@ type Order struct {
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	FreeDeliverLine       uint
-	MaintaneTimeMinute    uint
+	MaintainTimeMinute    uint
 }
 
 type Money struct {
