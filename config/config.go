@@ -19,13 +19,13 @@ type Security struct {
 }
 
 type Order struct {
-	EvalTimeoutDay        uint
-	CompleteTimeoutDay    uint
-	HistoryTimeoutDay     uint
-	CheckoutExpiresMinute time.Duration
-	WxPayExpiresMinute    time.Duration
-	FreeDeliverLine       uint
-	MaintainTimeMinute    uint
+	EvalTimeoutDay        uint          `default:"15"`
+	CompleteTimeoutDay    uint          `default:"10"`
+	HistoryTimeoutDay     uint          `default:"5"`
+	CheckoutExpiresMinute time.Duration `default:"30"`
+	WxPayExpiresMinute    time.Duration `default:"120"`
+	FreeDeliverLine       uint          `default:"20000"`
+	MaintainTimeMinute    uint          `default:"60"`
 }
 
 type Money struct {
@@ -43,7 +43,7 @@ type Weixin struct {
 	MchId          string
 	CertFile       string
 	KeyFile        string
-	PayBody        string // "丝路车友会-微商城"
+	PayBody        string
 	PayNotifyURL   string
 	TransCheckName string
 }
@@ -55,9 +55,9 @@ type Alidayu struct {
 	CodeLen        int
 	SignName       string
 	Template       string
-	RetryMinSecond time.Duration
-	ExpiresMinute  time.Duration
-	ClearsMinute   time.Duration
+	RetryMinSecond time.Duration `default:"50"`
+	ExpiresMinute  time.Duration `default:"2"`
+	ClearsMinute   time.Duration `default:"2"`
 }
 
 type Mysql struct {
