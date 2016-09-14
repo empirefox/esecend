@@ -8,7 +8,7 @@ type Profile struct {
 	ID                   uint   `reform:"id,pk"` // always 1
 	Phone                string `reform:"phone"`
 	DefaultHeadImage     string `reform:"default_head_image"`
-	UserCashRebateStages uint   `reform:"user_cash_rebate_stages"`
+	UserCashRebateStages uint   `reform:"user_cash_rebate_stages" default:"3"`
 }
 
 type ProfileResponse struct {
