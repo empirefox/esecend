@@ -13,15 +13,14 @@ import (
 
 type Claims struct {
 	jwt.StandardClaims
-	AdminId  uint `json:"aid"`
+	AdminId uint `json:"aid"`
 	UserId  uint `json:"uid"`
 	OrderID uint `json:"oid"`
 
-	State front.OrderState `json:"state"`
+	State front.OrderState `json:"state,omitempty"`
 
-	WxRefund     uint `json:"wx_refund,omitempty"`
-	CashRefund   uint `json:"cash_refund,omitempty"`
-	PointsRefund uint `json:"points_refund,omitempty"`
+	WxRefund   uint `json:"wx_refund,omitempty"`
+	CashRefund uint `json:"cash_refund,omitempty"`
 
 	DeliverCom string `json:"deliver_com,omitempty"`
 	DeliverNo  string `json:"deliver_no,omitempty"`
