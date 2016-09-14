@@ -118,6 +118,7 @@ func (s *Server) BuildEngine() {
 	// for admin
 	a := router.Group("/admin", s.MustAdmin)
 	a.GET("/order_state", s.GetMgrOrderState)
+	a.GET("/reload_profile", s.GetMgrReloadProfile)
 
 	s.Engine = router
 }
