@@ -22,25 +22,20 @@ type Server struct {
 	*gin.Engine
 	IsDevMode  bool
 	Config     *config.Config
+	WxClient   *wx.WxClient
+	DB         *dbsrv.DbService
+	Captcha    captchar.Captchar
 	Auther     *wo2.Auther
 	SecHandler *security.Handler
 	Admin      *admin.Admin
-	WxClient   *wx.WxClient
 	SmsSender  sms.Sender
-	DB         *dbsrv.DbService
-	Captcha    captchar.Captchar
 	ProductHub *hub.ProductHub
 	OrderHub   *hub.OrderHub
 
 	ProductResource *search.Resource
 }
 
-func (s *Server) BuildEngine() error {
-	err := s.DB.LoadProfile()
-	if err != nil {
-		return err
-	}
-
+func (s *Server) BuildEngine() {
 	corsMiddleWare := s.Cors("GET, PUT, POST, DELETE")
 
 	auth := s.Auther.Middleware()
@@ -125,9 +120,10 @@ func (s *Server) BuildEngine() error {
 	a.GET("/order_state", s.GetMgrOrderState)
 
 	s.Engine = router
-	return nil
 }
 
 func (s *Server) StartRun() error {
+	go s.ProductHub.Run()
+	go s.OrderHub.Run()
 	return s.Run(paas.BindAddr)
 }
