@@ -337,6 +337,24 @@ func (dbs *DbService) OrderMaintanence(order *front.Order) (cols []string, err e
 
 			// 6. move rebate of user1 to frontend.
 			// backend just accepts the choice of user1
+		} else {
+			// save points
+			var top front.PointsItem
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID)).Order(goqu.I("$CreatedAt").Desc())
+			if err = db.DsSelectOneTo(&top, ds); err != nil && err != reform.ErrNoRows {
+				return
+			}
+
+			err = db.Insert(&front.PointsItem{
+				UserID:    order.UserID,
+				CreatedAt: now,
+				Amount:    int(order.PayAmount),
+				Balance:   top.Balance + int(order.PayAmount),
+				OrderID:   order.ID,
+			})
+			if err != nil {
+				return
+			}
 		}
 	}
 
