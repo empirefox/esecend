@@ -8,11 +8,11 @@ import (
 
 type userVipRebateInput struct {
 	tokUsr  *models.User
-	payload *front.VipRebateRequest
+	payload *front.VipRebatePayload
 	chanErr chan<- error
 }
 
-func (hub *OrderHub) UserVipRebate(tokUsr *models.User, payload *front.VipRebateRequest) (err error) {
+func (hub *OrderHub) UserVipRebate(tokUsr *models.User, payload *front.VipRebatePayload) (err error) {
 	chanErr := make(chan error)
 	in := &userVipRebateInput{tokUsr, payload, chanErr}
 	hub.chanInput <- in

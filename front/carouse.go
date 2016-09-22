@@ -16,6 +16,6 @@ type CarouselItem struct {
 	Link       string        `reform:"link"`
 	ProductID  uint          `reform:"product_id"`
 	CategoryID uint          `reform:"category_id"`
-	Pos        int64         `reform:"pos"`
 	Billboard  BillboardType `reform:"billboard"`
+	Pos        int64         `reform:"pos"`
 }

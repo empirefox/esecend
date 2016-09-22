@@ -1,6 +1,14 @@
 //go:generate reform
 package front
 
+type VipRebateType int
+
+const (
+	TVipRebateUnknown VipRebateType = iota
+	TVipRebateRebate
+	TVipRebateReward
+)
+
 //reform:cc_member
 type VipIntro struct {
 	ID           uint   `reform:"id,pk"`
@@ -29,7 +37,7 @@ func (vip *VipRebateOrigin) Valid(now int64) bool {
 	return vip.NotBefore <= now && now < vip.ExpiresAt
 }
 
-type VipRebateRequest struct {
-	Type   string
+type VipRebatePayload struct {
+	Type   VipRebateType
 	SubIDs []uint
 }

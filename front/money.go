@@ -24,9 +24,9 @@ type UserCash struct {
 	UserID    uint         `reform:"user_id" json:"-"`
 	OrderID   uint         `reform:"order_id"`
 	CreatedAt int64        `reform:"create_time"`
+	Type      UserCashType `reform:"log_type"`
 	Amount    int          `reform:"amount"`
 	Remark    string       `reform:"remark"`
-	Type      UserCashType `reform:"log_type"`
 	Balance   int          `reform:"balance"`
 }
 
@@ -62,7 +62,8 @@ type UserCashRebate struct {
 	Remark    string       `reform:"remark"`
 	Stages    uint         `reform:"stages"`
 	DoneAt    int64        `reform:"done_at"`
-	Items     []*UserCashRebateItem
+
+	Items []*UserCashRebateItem `json:"-"`
 }
 
 //reform:cc_member_credit_log

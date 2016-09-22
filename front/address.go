@@ -4,7 +4,7 @@ package front
 //reform:cc_member_address
 type Address struct {
 	ID       uint   `reform:"id,pk"`
-	UserID   uint   `reform:"uid"`
+	UserID   uint   `reform:"uid" json:"-"`
 	Contact  string `reform:"contactor"`
 	Phone    string `reform:"tel_num"`
 	Province string `reform:"province"`

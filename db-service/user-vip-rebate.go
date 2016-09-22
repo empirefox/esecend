@@ -11,7 +11,7 @@ import (
 	"github.com/empirefox/reform"
 )
 
-func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebateRequest) error {
+func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebatePayload) error {
 	now := time.Now().Unix()
 	db := dbs.GetDB()
 
@@ -28,7 +28,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 	}
 
 	switch payload.Type {
-	case "rebate":
+	case front.TVipRebateRebate:
 		if vip.ID == 0 {
 			return cerr.NotVip
 		}
@@ -138,7 +138,7 @@ func (dbs *DbService) UserVipRebate(tokUsr *models.User, payload *front.VipRebat
 			}
 		}
 
-	case "reward":
+	case front.TVipRebateReward:
 		// sub vips
 		if len(payload.SubIDs) == 0 {
 			return cerr.VipRebateSubIDsLen

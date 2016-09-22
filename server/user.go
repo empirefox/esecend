@@ -198,7 +198,7 @@ func (s *Server) PostPreBindPhone(c *gin.Context) {
 }
 
 func (s *Server) PostUserRebate(c *gin.Context) {
-	var payload front.VipRebateRequest
+	var payload front.VipRebatePayload
 	if err := c.BindJSON(&payload); Abort(c, err) {
 		return
 	}
