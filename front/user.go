@@ -3,14 +3,35 @@ package front
 
 import "github.com/dgrijalva/jwt-go"
 
+//reform:cc_member
+type SetUserInfoPayload struct {
+	ID           uint   `reform:"id,pk" json"-"`
+	Nickname     string `reform:"name"`
+	Sex          int    `reform:"sex"`
+	City         string `reform:"city"`
+	Province     string `reform:"province"`
+	HeadImageURL string `reform:"avatar"`
+	Birthday     int64  `reform:"birthday"`
+	CarInsurance string `reform:"car_insurance"`
+	InsuranceFee uint   `reform:"insurance_fee"`
+	CarIntro     string `reform:"car_intro"`
+	Hobby        string `reform:"hobby"`
+	Career       string `reform:"career"`
+	Demand       string `reform:"demand"`
+	Intro        string `reform:"intro"`
+	UpdatedAt    int64  `reform:"update_date" json"-"`
+}
+
 type UserInfo struct {
-	Nickname     string
-	Sex          int
-	City         string
-	Province     string
-	HeadImageURL string
-	Birthday     int64
-	HasPayKey    bool
+	Writable SetUserInfoPayload
+
+	CreatedAt int64
+	UpdatedAt int64
+	HasPayKey bool
+}
+
+type SetUserInfoResponse struct {
+	UpdatedAt int64
 }
 
 // out by auth middleware
@@ -22,16 +43,11 @@ type UserTokenResponse struct {
 
 type TokenClaims struct {
 	jwt.StandardClaims
-	OpenId    string `json:"oid,omitempty"`
-	UserId    uint   `json:"uid,omitempty"`
-	Privilege string `json:"pvl,omitempty"`
-	Phone     string `json:"mob,omitempty"`
-	Nonce     string `json:"non,omitempty"`
-}
-
-type SetUserInfoPayload struct {
-	Key   string
-	Value string
+	OpenId string `json:"oid,omitempty"`
+	UserId uint   `json:"uid,omitempty"`
+	User1  uint   `json:"us1,omitempty"`
+	Phone  string `json:"mob,omitempty"`
+	Nonce  string `json:"non,omitempty"`
 }
 
 type PreBindPhonePayload struct {
@@ -44,10 +60,6 @@ type BindPhonePayload struct {
 	CaptchaID    string `binding:"required"`
 	Captcha      string `binding:"required"`
 	RefreshToken string
-}
-
-type BindPhoneResponse struct {
-	AccessToken *string
 }
 
 type RefreshTokenResponse struct {

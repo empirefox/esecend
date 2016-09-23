@@ -15,15 +15,12 @@ var (
 //reform:cc_member
 type User struct {
 	// claims below 5 fields
-	ID        uint   `reform:"id,pk"`
-	OpenId    string `reform:"open_id"`
-	Privilege string `reform:"privilege"`
-	Phone     string `reform:"phone"`
-	User1     uint   `reform:"parent_id"`
+	ID     uint   `reform:"id,pk"`
+	OpenId string `reform:"open_id"`
+	Phone  string `reform:"phone"`
+	User1  uint   `reform:"parent_id"`
 
-	CreatedAt int64 `reform:"create_date"`
-	UpdatedAt int64 `reform:"update_date"`
-	SigninAt  int64 `reform:"last_login"`
+	SigninAt int64 `reform:"last_login"`
 
 	// front.UserInfo
 	Nickname     string `reform:"name"`
@@ -32,8 +29,15 @@ type User struct {
 	Province     string `reform:"province"`
 	HeadImageURL string `reform:"avatar"`
 	Birthday     int64  `reform:"birthday"`
-
-	Intro string `reform:"intro"`
+	CarInsurance string `reform:"car_insurance"`
+	InsuranceFee uint   `reform:"insurance_fee"`
+	CarIntro     string `reform:"car_intro"`
+	Hobby        string `reform:"hobby"`
+	Career       string `reform:"career"`
+	Demand       string `reform:"demand"`
+	Intro        string `reform:"intro"`
+	CreatedAt    int64  `reform:"create_date"`
+	UpdatedAt    int64  `reform:"update_date"`
 
 	UnionId string `reform:"union_id"`
 
@@ -55,11 +59,23 @@ type User struct {
 
 func (u *User) Info() *front.UserInfo {
 	return &front.UserInfo{
-		Nickname:     u.Nickname,
-		Sex:          u.Sex,
-		City:         u.City,
-		Province:     u.Province,
-		HeadImageURL: u.HeadImageURL,
-		HasPayKey:    u.Paykey != nil && len(*u.Paykey) > 0,
+		Writable: front.SetUserInfoPayload{
+			Nickname:     u.Nickname,
+			Sex:          u.Sex,
+			City:         u.City,
+			Province:     u.Province,
+			HeadImageURL: u.HeadImageURL,
+			Birthday:     u.Birthday,
+			CarInsurance: u.CarInsurance,
+			InsuranceFee: u.InsuranceFee,
+			CarIntro:     u.CarIntro,
+			Hobby:        u.Hobby,
+			Career:       u.Career,
+			Demand:       u.Demand,
+			Intro:        u.Intro,
+		},
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+		HasPayKey: u.Paykey != nil && len(*u.Paykey) > 0,
 	}
 }

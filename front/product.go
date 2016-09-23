@@ -17,6 +17,7 @@ type Product struct {
 	CategoryID uint   `reform:"cate_id"`
 	StoreID    uint   `reform:"sale_user_id"`
 	IsABC      bool   `reform:"is_abc"`
+	SpecialID  uint   `reform:"special_id"`
 }
 
 //reform:cc_product_sku_att

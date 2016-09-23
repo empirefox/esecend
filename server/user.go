@@ -19,18 +19,15 @@ func (s *Server) PostSetUserInfo(c *gin.Context) {
 		return
 	}
 
-	if payload.Key == "" || payload.Value == "" {
-		front.NewCodev(cerr.InvalidPostBody).Abort(c, http.StatusBadRequest)
-		return
-	}
-
 	tokUsr := s.TokenUser(c)
-	err := s.DB.UserSetInfo(tokUsr.ID, &payload)
+	payload.ID = tokUsr.ID
+	payload.UpdatedAt = time.Now().Unix()
+	err := s.DB.UserSetInfo(&payload)
 	if Abort(c, err) {
 		return
 	}
 
-	c.AbortWithStatus(http.StatusOK)
+	c.JSON(http.StatusOK, &front.SetUserInfoResponse{UpdatedAt: payload.UpdatedAt})
 }
 
 func (s *Server) PostSetPaykey(c *gin.Context) {
@@ -194,7 +191,8 @@ func (s *Server) PostPreBindPhone(c *gin.Context) {
 		return
 	}
 
-	c.AbortWithStatus(http.StatusOK)
+	// TODO to real counter
+	c.JSON(http.StatusOK, 1)
 }
 
 func (s *Server) PostUserRebate(c *gin.Context) {

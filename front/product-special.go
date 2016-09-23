@@ -9,8 +9,8 @@ type Special struct {
 }
 
 //reform:cc_product_special
-type ProductSpecial struct {
-	ID        uint `reform:"id,pk"`
-	SpecialID uint `reform:"special_id"`
-	ProductID uint `reform:"product_id"`
-}
+//type ProductSpecial struct {
+//	ID        uint `reform:"id,pk"`
+//	SpecialID uint `reform:"special_id"`
+//	ProductID uint `reform:"product_id"`
+//}

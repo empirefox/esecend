@@ -3,7 +3,6 @@ package security
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -61,7 +60,6 @@ func (h *Handler) Login(userinfo *mpoauth2.UserInfo, user1 uint) (interface{}, e
 			OpenId:       userinfo.OpenId,
 			UnionId:      userinfo.UnionId,
 			RefreshToken: &encRefreshToken,
-			Privilege:    strings.Join(userinfo.Privilege, "|"),
 			CreatedAt:    time.Now().Unix(),
 
 			Nickname:     userinfo.Nickname,
@@ -114,11 +112,11 @@ func (h *Handler) NewTokenWithIat(usr *models.User, now int64) (*string, error) 
 			IssuedAt:  now,
 			Subject:   "Weixin",
 		},
-		OpenId:    usr.OpenId,
-		UserId:    usr.ID,
-		Privilege: usr.Privilege,
-		Phone:     usr.Phone,
-		Nonce:     uniuri.NewLen(32),
+		OpenId: usr.OpenId,
+		UserId: usr.ID,
+		User1:  usr.User1,
+		Phone:  usr.Phone,
+		Nonce:  uniuri.NewLen(32),
 	}
 
 	key := []byte(uniuri.NewLen(128))
@@ -191,10 +189,10 @@ func (h *Handler) ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interfac
 
 	claims := tok.Claims.(*front.TokenClaims)
 	usr := &models.User{
-		OpenId:    claims.OpenId,
-		ID:        claims.UserId,
-		Privilege: claims.Privilege,
-		Phone:     claims.Phone,
+		OpenId: claims.OpenId,
+		ID:     claims.UserId,
+		User1:  claims.User1,
+		Phone:  claims.Phone,
 	}
 
 	return tok, usr, err

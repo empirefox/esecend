@@ -16,7 +16,7 @@ func QueryRemote(com, nu string) (*http.Response, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Referer", "http://www.kuai"+"di100.com/")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:48.0) Gecko/20100101 Firefox/48.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:49.0) Gecko/20100101 Firefox/49.0")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	return http.DefaultClient.Do(req)
 }

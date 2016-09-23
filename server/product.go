@@ -62,18 +62,6 @@ func (s *Server) GetProducts(c *gin.Context) {
 	ResponseObject(c, data, err)
 }
 
-func (s *Server) GetSpecialProducts(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	if id == 0 {
-		front.NewCodev(cerr.InvalidUrlParam).Abort(c, http.StatusBadRequest)
-		return
-	}
-
-	data, err := s.DB.GetSpecialProducts(uint(id))
-
-	ResponseObject(c, data, err)
-}
-
 func (s *Server) GetProduct(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	if id == 0 {

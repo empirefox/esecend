@@ -1,7 +1,6 @@
 package dbsrv
 
 import (
-	"strconv"
 	"time"
 
 	"gopkg.in/doug-martin/goqu.v3"
@@ -14,29 +13,8 @@ import (
 	"github.com/golang/glog"
 )
 
-func (dbs *DbService) UserSetInfo(id uint, payload *front.SetUserInfoPayload) error {
-	data := models.User{ID: id}
-	switch payload.Key {
-	case "Nickname":
-		data.Nickname = payload.Value
-	case "Sex":
-		value, err := strconv.Atoi(payload.Value)
-		if err != nil {
-			return err
-		}
-		data.Sex = value
-	case "HeadImageURL":
-		data.HeadImageURL = payload.Value
-	case "Birthday":
-		value, err := strconv.ParseInt(payload.Value, 10, 64)
-		if err != nil {
-			return err
-		}
-		data.Birthday = value
-	default:
-		return cerr.InvalidPostBody
-	}
-	return dbs.GetDB().UpdateColumns(&data, payload.Key)
+func (dbs *DbService) UserSetInfo(payload *front.SetUserInfoPayload) error {
+	return dbs.GetDB().Update(payload)
 }
 
 func (dbs *DbService) FindUserByPhone(phone string) (*models.User, error) {
