@@ -32,6 +32,7 @@ type Server struct {
 	ProductHub *hub.ProductHub
 	OrderHub   *hub.OrderHub
 
+	NewsResource    *search.Resource
 	ProductResource *search.Resource
 }
 
@@ -65,6 +66,7 @@ func (s *Server) BuildEngine() {
 	router.GET("/product/attrs", s.GetProductAttrs)
 	router.GET("/groupbuy", s.GetGroupBuy)
 	router.GET("/vips", s.GetVipIntros)
+	router.GET("/news", s.GetNews)
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
