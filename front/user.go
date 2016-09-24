@@ -10,7 +10,6 @@ type SetUserInfoPayload struct {
 	Sex          int    `reform:"sex"`
 	City         string `reform:"city"`
 	Province     string `reform:"province"`
-	HeadImageURL string `reform:"avatar"`
 	Birthday     int64  `reform:"birthday"`
 	CarInsurance string `reform:"car_insurance"`
 	InsuranceFee uint   `reform:"insurance_fee"`
@@ -25,8 +24,12 @@ type SetUserInfoPayload struct {
 type UserInfo struct {
 	Writable SetUserInfoPayload
 
+	// single modify
+	HeadImageURL string
+
 	CreatedAt int64
 	UpdatedAt int64
+
 	HasPayKey bool
 }
 

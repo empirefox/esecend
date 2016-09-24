@@ -64,7 +64,6 @@ func (u *User) Info() *front.UserInfo {
 			Sex:          u.Sex,
 			City:         u.City,
 			Province:     u.Province,
-			HeadImageURL: u.HeadImageURL,
 			Birthday:     u.Birthday,
 			CarInsurance: u.CarInsurance,
 			InsuranceFee: u.InsuranceFee,
@@ -74,8 +73,9 @@ func (u *User) Info() *front.UserInfo {
 			Demand:       u.Demand,
 			Intro:        u.Intro,
 		},
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
-		HasPayKey: u.Paykey != nil && len(*u.Paykey) > 0,
+		HeadImageURL: u.HeadImageURL,
+		CreatedAt:    u.CreatedAt,
+		UpdatedAt:    u.UpdatedAt,
+		HasPayKey:    u.Paykey != nil && len(*u.Paykey) > 0,
 	}
 }
