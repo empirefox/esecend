@@ -10,5 +10,4 @@ type Sku struct {
 	MarketPrice uint   `reform:"market_price"`
 	Freight     uint   `reform:"freight"`
 	ProductID   uint   `reform:"product_id"`
-	Points      uint   `reform:"points"` // override others
 }

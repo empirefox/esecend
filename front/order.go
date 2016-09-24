@@ -38,21 +38,20 @@ const (
 
 //reform:cc_order_item
 type OrderItem struct {
-	ID         uint   `reform:"id,pk"`
-	UserID     uint   `reform:"user_id" json:"-"` // check owner only
-	OrderID    uint   `reform:"order_id"`
-	ProductID  uint   `reform:"product_id"`
-	SkuID      uint   `reform:"sku_id"`
-	StoreID    uint   `reform:"store_id"`
-	IsABC      bool   `reform:"is_abc"`
-	Quantity   uint   `reform:"product_count"`
-	Price      uint   `reform:"product_price"`
-	Points     uint   `reform:"points"` // override price
-	CreatedAt  int64  `reform:"created_time"`
-	Name       string `reform:"name"`
-	Img        string `reform:"img"`
-	Attrs      string `reform:"attrs"`
-	DeliverFee uint   `reform:"deliver_fee"`
+	ID         uint    `reform:"id,pk"`
+	UserID     uint    `reform:"user_id" json:"-"` // check owner only
+	OrderID    uint    `reform:"order_id"`
+	ProductID  uint    `reform:"product_id"`
+	SkuID      uint    `reform:"sku_id"`
+	StoreID    uint    `reform:"store_id"`
+	Vpn        VpnType `reform:"vpn"`
+	Quantity   uint    `reform:"product_count"`
+	Price      uint    `reform:"product_price"`
+	CreatedAt  int64   `reform:"created_time"`
+	Name       string  `reform:"name"`
+	Img        string  `reform:"img"`
+	Attrs      string  `reform:"attrs"`
+	DeliverFee uint    `reform:"deliver_fee"`
 
 	Store1 uint `reform:"store1"  json:"-"`
 

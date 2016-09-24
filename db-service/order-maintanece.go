@@ -240,7 +240,7 @@ func (dbs *DbService) OrderMaintanence(order *front.Order) (cols []string, err e
 
 		// ABC
 		var abcItem *front.OrderItem
-		if len(items) == 1 && items[0].IsABC {
+		if len(items) == 1 && items[0].Vpn == front.TVpnVip {
 			abcItem = items[0]
 
 			// 1. get user

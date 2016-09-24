@@ -55,14 +55,12 @@ func (dbs *DbService) CheckoutOrderOne(
 		return nil, cerr.InvalidSkuStock
 	}
 
-	isPoints := sku.Points != 0
-
 	var product front.Product
 	if err = db.FindByPrimaryKeyTo(&product, sku.ProductID); err != nil {
 		return nil, err
 	}
 
-	if isPoints == product.IsABC {
+	if product.Vpn != front.TVpnVip && product.Vpn != front.TVpnPoints {
 		return nil, cerr.OnlyAbcOrPoints
 	}
 
@@ -138,8 +136,8 @@ func (dbs *DbService) CheckoutOrderOne(
 		User1:          tokUsr.User1,
 	}
 
-	if isPoints {
-		order.PayPoints = sku.Points
+	if product.Vpn == front.TVpnPoints {
+		order.PayPoints = sku.SalePrice
 	} else {
 		// Invoice
 		order.InvoiceTo = payload.InvoiceTo
@@ -165,7 +163,9 @@ func (dbs *DbService) CheckoutOrderOne(
 	item := front.OrderItem{
 		ProductID: sku.ProductID,
 		SkuID:     sku.ID,
+		Vpn:       product.Vpn,
 		Quantity:  1,
+		Price:     sku.SalePrice,
 		CreatedAt: now,
 		Img:       sku.Img,
 		UserID:    tokUsr.ID,
@@ -177,12 +177,6 @@ func (dbs *DbService) CheckoutOrderOne(
 	}
 	if item.Img == "" {
 		item.Img = product.Img
-	}
-	if isPoints {
-		item.Points = sku.Points
-	} else {
-		item.Price = sku.SalePrice
-		item.IsABC = true
 	}
 
 	// update sku stock
@@ -263,9 +257,6 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	now := time.Now().Unix()
 	for _, skui := range skus {
 		sku := skui.(*front.Sku)
-		if sku.Points != 0 {
-			return nil, cerr.NoAbcOrPoints
-		}
 		num := skuidToPayloadItem[sku.ID].Quantity
 		if num == 0 || num > sku.Stock {
 			return nil, cerr.InvalidSkuStock
@@ -312,7 +303,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 	for _, producti := range products {
 		product := producti.(*front.Product)
 		productMap[product.ID] = product
-		if product.IsABC {
+		if product.Vpn != front.TVpnNormal {
 			return nil, cerr.NoAbcOrPoints
 		}
 	}

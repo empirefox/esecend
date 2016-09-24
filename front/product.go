@@ -3,21 +3,29 @@ package front
 
 import "github.com/empirefox/reform"
 
+type VpnType int
+
+const (
+	TVpnNormal VpnType = iota
+	TVpnPoints
+	TVpnVip
+)
+
 //reform:cc_product
 type Product struct {
-	ID         uint   `reform:"product_id,pk"`
-	Name       string `reform:"product_name"`
-	Img        string `reform:"photo"`
-	Intro      string `reform:"intro"`
-	Detail     string `reform:"detail"`
-	Saled      uint   `reform:"saleCount"`
-	CreatedAt  int64  `reform:"create_date"`
-	SaledAt    int64  `reform:"time_sale"`
-	ShelfOffAt int64  `reform:"time_shelfoff"`
-	CategoryID uint   `reform:"cate_id"`
-	StoreID    uint   `reform:"sale_user_id"`
-	IsABC      bool   `reform:"is_abc"`
-	SpecialID  uint   `reform:"special_id"`
+	ID         uint    `reform:"product_id,pk"`
+	Name       string  `reform:"product_name"`
+	Img        string  `reform:"photo"`
+	Intro      string  `reform:"intro"`
+	Detail     string  `reform:"detail"`
+	Saled      uint    `reform:"saleCount"`
+	CreatedAt  int64   `reform:"create_date"`
+	SaledAt    int64   `reform:"time_sale"`
+	ShelfOffAt int64   `reform:"time_shelfoff"`
+	CategoryID uint    `reform:"cate_id"`
+	StoreID    uint    `reform:"sale_user_id"`
+	Vpn        VpnType `reform:"vpn"`
+	SpecialID  uint    `reform:"special_id"`
 }
 
 //reform:cc_product_sku_att
