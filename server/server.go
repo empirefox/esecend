@@ -72,6 +72,7 @@ func (s *Server) BuildEngine() {
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
 	router.GET("/myfans", auth, mustAuthed, s.GetMyFans)
+	router.GET("/myvips", auth, mustAuthed, s.GetMyVips)
 	router.GET("/myqualifications", auth, mustAuthed, s.GetMyQualifications)
 	router.POST("/rebate", auth, mustAuthed, s.PostUserRebate)
 	router.POST("/withdraw", auth, mustAuthed, s.PostUserWithdraw)

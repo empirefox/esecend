@@ -38,6 +38,7 @@ type Money struct {
 }
 
 type Weixin struct {
+	WebScope       string `default:"snsapi_base"`
 	AppId          string
 	ApiKey         string
 	MchId          string

@@ -27,7 +27,6 @@ type User struct {
 	Sex          int    `reform:"sex"`
 	City         string `reform:"city"`
 	Province     string `reform:"province"`
-	HeadImageURL string `reform:"avatar"`
 	Birthday     int64  `reform:"birthday"`
 	CarInsurance string `reform:"car_insurance"`
 	InsuranceFee uint   `reform:"insurance_fee"`
@@ -38,6 +37,8 @@ type User struct {
 	Intro        string `reform:"intro"`
 	CreatedAt    int64  `reform:"create_date"`
 	UpdatedAt    int64  `reform:"update_date"`
+
+	HeadImageURL string `reform:"avatar"`
 
 	UnionId string `reform:"union_id"`
 

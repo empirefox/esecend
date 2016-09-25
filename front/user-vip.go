@@ -13,8 +13,19 @@ const (
 type VipIntro struct {
 	ID           uint   `reform:"id,pk"`
 	CreatedAt    int64  `reform:"create_date"`
-	Nickname     string `reform:"name"`
 	HeadImageURL string `reform:"avatar"`
+
+	Nickname     string `reform:"name"`
+	Sex          int    `reform:"sex"`
+	City         string `reform:"city"`
+	Province     string `reform:"province"`
+	Birthday     int64  `reform:"birthday"`
+	CarInsurance string `reform:"car_insurance"`
+	InsuranceFee uint   `reform:"insurance_fee"`
+	CarIntro     string `reform:"car_intro"`
+	Hobby        string `reform:"hobby"`
+	Career       string `reform:"career"`
+	Demand       string `reform:"demand"`
 	Intro        string `reform:"intro"`
 }
 

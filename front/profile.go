@@ -9,6 +9,9 @@ type Profile struct {
 	Phone                string `reform:"phone"`
 	DefaultHeadImage     string `reform:"default_head_image"`
 	UserCashRebateStages uint   `reform:"user_cash_rebate_stages" default:"3"`
+	IntroVipDetail       string `reform:"intro_vip_detail"`
+	IntroVipPrivilege    string `reform:"intro_vip_privilege"`
+	IntroCarInsurance    string `reform:"intro_car_insurance"`
 }
 
 type ProfileResponse struct {
@@ -16,6 +19,8 @@ type ProfileResponse struct {
 	WxAppId     string
 	WxScope     string
 	WxLoginPath string
+
+	RewardFromVipCent uint
 
 	// Config.Order
 	EvalTimeoutDay        uint

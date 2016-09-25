@@ -20,8 +20,11 @@ func (s *Server) GetProfile(c *gin.Context) {
 		Profile: &profile,
 
 		WxAppId:     s.Config.Weixin.AppId,
+		WxScope:     s.Config.Weixin.WebScope,
 		WxLoginPath: s.Config.Security.WxOauthPath,
-		//	WxScope     s.Config.Weixin.AppId,
+
+		// Config.Money
+		RewardFromVipCent: s.Config.Money.RewardFromVipCent,
 
 		// Config.Order
 		EvalTimeoutDay:        s.Config.Order.EvalTimeoutDay,
@@ -84,6 +87,18 @@ func (s *Server) GetMyFans(c *gin.Context) {
 		Stores: stores,
 		Fans:   fans,
 	})
+}
+
+func (s *Server) GetMyVips(c *gin.Context) {
+	db := s.DB.GetDB()
+	tokUsr := s.TokenUser(c)
+
+	vips, err := db.FindAllFrom(front.VipRebateOriginTable, "$UserID", tokUsr.ID)
+	if AbortWithoutNoRecord(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, vips)
 }
 
 // front-end needs to filter not activated
