@@ -5,6 +5,7 @@ type BillboardType int
 
 const (
 	TBillboardUnknow BillboardType = iota
+	TBillboardAdSlide
 	TBillboardHome
 	TBillboardNews
 )

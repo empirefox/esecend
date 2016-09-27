@@ -17,6 +17,7 @@ type CartItem struct {
 }
 
 type SaveToCartPayload struct {
+	ID       uint
 	Img      string
 	Name     string
 	Type     string

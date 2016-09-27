@@ -37,6 +37,12 @@ func (s *Server) PostSetPaykey(c *gin.Context) {
 	}
 
 	tokUsr := s.TokenUser(c)
+
+	if !s.Captcha.Verify(tokUsr.ID, payload.CaptchaID, payload.Captcha) {
+		front.NewCodev(cerr.CaptchaRejected).Abort(c, http.StatusBadRequest)
+		return
+	}
+
 	if tokUsr.Phone == "" {
 		front.NewCodev(cerr.PhoneBindRequired).Abort(c, http.StatusPreconditionFailed)
 		return
@@ -92,6 +98,12 @@ func (s *Server) PostBindPhone(c *gin.Context) {
 	}
 
 	tokUsr := s.TokenUser(c)
+
+	if !s.Captcha.Verify(tokUsr.ID, data.CaptchaID, data.Captcha) {
+		front.NewCodev(cerr.CaptchaRejected).Abort(c, http.StatusBadRequest)
+		return
+	}
+
 	if tokUsr.Phone == data.Phone {
 		front.NewCodev(cerr.RebindSamePhone).Abort(c, http.StatusBadRequest)
 		return
@@ -99,11 +111,6 @@ func (s *Server) PostBindPhone(c *gin.Context) {
 
 	if !s.SmsSender.Verify(sms.BindPhone, tokUsr.ID, data.Phone, data.Code) {
 		front.NewCodev(cerr.SmsVerifyFailed).Abort(c, http.StatusBadRequest)
-		return
-	}
-
-	if !s.Captcha.Verify(tokUsr.ID, data.CaptchaID, data.Captcha) {
-		front.NewCodev(cerr.CaptchaRejected).Abort(c, http.StatusBadRequest)
 		return
 	}
 

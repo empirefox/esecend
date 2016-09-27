@@ -71,6 +71,8 @@ type RefreshTokenResponse struct {
 }
 
 type SetPaykeyPayload struct {
-	Key  string
-	Code string
+	Key       string
+	Code      string
+	CaptchaID string `binding:"required"`
+	Captcha   string `binding:"required"`
 }
