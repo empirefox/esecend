@@ -29,4 +29,6 @@ type ProfileResponse struct {
 	CheckoutExpiresMinute time.Duration
 	WxPayExpiresMinute    time.Duration
 	FreeDeliverLine       uint
+
+	HeadPrefix string
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/captchar"
+	"github.com/empirefox/esecend/cdn"
 	"github.com/empirefox/esecend/config"
 	"github.com/empirefox/esecend/db-service"
 	"github.com/empirefox/esecend/front"
@@ -22,6 +23,7 @@ type Server struct {
 	*gin.Engine
 	IsDevMode  bool
 	Config     *config.Config
+	Cdn        *cdn.Qiniu
 	WxClient   *wx.WxClient
 	DB         *dbsrv.DbService
 	Captcha    captchar.Captchar
@@ -70,6 +72,7 @@ func (s *Server) BuildEngine() {
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
+	router.GET("/headtoken", auth, mustAuthed, s.GetHeadUptoken)
 	router.GET("/captcha", auth, mustAuthed, s.GetCaptcha)
 	router.GET("/myfans", auth, mustAuthed, s.GetMyFans)
 	router.GET("/myvips", auth, mustAuthed, s.GetMyVips)

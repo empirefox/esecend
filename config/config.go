@@ -76,6 +76,15 @@ type Paging struct {
 	MaxSize  uint64
 }
 
+type Qiniu struct {
+	Zone                  int
+	Ak                    string
+	Sk                    string
+	HeadBucketName        string
+	HeadPrefix            string `default:"head/"`
+	HeadUptokenLifeMinute uint32 `default:"30"`
+}
+
 type Config struct {
 	Security Security
 	Order    Order
@@ -84,4 +93,5 @@ type Config struct {
 	Alidayu  Alidayu
 	Mysql    Mysql
 	Paging   Paging
+	Qiniu    Qiniu
 }
