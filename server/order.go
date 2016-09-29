@@ -23,6 +23,20 @@ func (s *Server) PostCheckout(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
+func (s *Server) PostCheckoutOne(c *gin.Context) {
+	var payload front.CheckoutOnePayload
+	if err := c.BindJSON(&payload); Abort(c, err) {
+		return
+	}
+
+	data, err := s.ProductHub.CheckoutOrderOne(s.TokenUser(c), &payload)
+	if Abort(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
 func (s *Server) PostOrderWxPrepay(c *gin.Context) {
 	var payload front.OrderPrepayPayload
 	if err := c.BindJSON(&payload); Abort(c, err) {

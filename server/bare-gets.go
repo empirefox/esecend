@@ -250,6 +250,21 @@ func (s *Server) GetOrders(c *gin.Context) {
 	ResponseArray(c, data, err)
 }
 
+func (s *Server) GetNewsItem(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if id == 0 {
+		front.NewCodev(cerr.InvalidUrlParam).Abort(c, http.StatusBadRequest)
+		return
+	}
+
+	data, err := s.DB.GetDB().FindByPrimaryKeyFrom(front.NewsItemTable, uint(id))
+	if Abort(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
 func (s *Server) GetCart(c *gin.Context) {
 	db := s.DB.GetDB()
 	tokUsr := s.TokenUser(c)

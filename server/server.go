@@ -69,6 +69,7 @@ func (s *Server) BuildEngine() {
 	router.GET("/groupbuy", s.GetGroupBuy)
 	router.GET("/vips", s.GetVipIntros)
 	router.GET("/news", s.GetNews)
+	router.GET("/news/1/:id", s.GetNewsItem)
 
 	// auth
 	router.GET("/refresh_token/:refreshToken", auth, s.HasToken, s.GetRefreshToken)
@@ -90,6 +91,7 @@ func (s *Server) BuildEngine() {
 	router.GET("/wallet", auth, mustAuthed, s.GetWallet)
 	router.GET("/orders", auth, mustAuthed, s.GetOrders)
 	router.POST("/checkout", auth, mustAuthed, s.PostCheckout)
+	router.POST("/checkout_one", auth, mustAuthed, s.PostCheckoutOne)
 	router.POST("/order_pay", auth, mustAuthed, s.PostOrderPay)
 	router.POST("/order_wx_pay", auth, mustAuthed, s.PostOrderWxPrepay)
 	router.GET("/order/:id", auth, mustAuthed, s.GetOrder)
@@ -98,7 +100,7 @@ func (s *Server) BuildEngine() {
 	router.POST("/eval/:id", auth, mustAuthed, s.PostEval)
 	router.GET("/cart", auth, mustAuthed, s.GetCart)
 	router.POST("/cart", auth, mustAuthed, s.PostCartSave)
-	router.DELETE("/cart/:id", auth, mustAuthed, s.DeleteCartItem)
+	router.DELETE("/cart", auth, mustAuthed, s.DeleteCartItems)
 	router.GET("/addrs", auth, mustAuthed, s.GetAddrs)
 	router.POST("/addr", auth, mustAuthed, s.PostAddr)
 	router.DELETE("/addr/:id", auth, mustAuthed, s.DeleteAddr)
