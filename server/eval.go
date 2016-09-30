@@ -49,10 +49,6 @@ func (s *Server) PostEval(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, &front.EvalResponse{
-		Order:    &order,
-		Evaled:   ra,
-		EvalAt:   payload.EvalAt,
-		EvalName: payload.EvalName,
-	})
+	s.DB.GetOrderItems()
+	c.JSON(http.StatusOK, &order)
 }
