@@ -83,6 +83,7 @@ type Qiniu struct {
 	HeadBucketName        string
 	HeadPrefix            string `default:"head/"`
 	HeadUptokenLifeMinute uint32 `default:"30"`
+	HeadUpHost            string `default:"https://up-z2.qbox.me"`
 }
 
 type Config struct {

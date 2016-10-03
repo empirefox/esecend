@@ -13,7 +13,8 @@ type Qiniu struct {
 	Client *kodo.Client
 }
 
-func NewQiniu(conf *config.Qiniu) *Qiniu {
+func NewQiniu(c *config.Config) *Qiniu {
+	conf := &c.Qiniu
 	kodoConfig := &kodo.Config{
 		AccessKey: conf.Ak,
 		SecretKey: conf.Sk,
@@ -27,7 +28,7 @@ func NewQiniu(conf *config.Qiniu) *Qiniu {
 func (q *Qiniu) HeadUptoken(userId uint) string {
 	putPolicy := &kodo.PutPolicy{
 		Scope:   fmt.Sprintf("%s:%s%d", q.conf.HeadBucketName, q.conf.HeadPrefix, userId),
-		UpHosts: q.Client.UpHosts,
+		UpHosts: []string{q.conf.HeadUpHost},
 		Expires: uint32(time.Now().Unix()) + q.conf.HeadUptokenLifeMinute*60,
 	}
 	return q.Client.MakeUptoken(putPolicy)
