@@ -141,10 +141,15 @@ func (s *Server) GetProductAttrs(c *gin.Context) {
 	if Abort(c, err) {
 		return
 	}
+	specials, err := db.SelectAllFrom(front.SpecialTable, "")
+	if Abort(c, err) {
+		return
+	}
 
 	c.JSON(http.StatusOK, &front.ProductAttrsResponse{
-		Attrs:  attrs,
-		Groups: grps,
+		Attrs:    attrs,
+		Groups:   grps,
+		Specials: specials,
 	})
 }
 

@@ -23,7 +23,7 @@ type FilterHandler func(params []string, c *Context)
 func (c *Context) HandleQueryFilters() {
 	filters := c.Resource.GetFilters()
 	for _, ft := range strings.Split(c.Query.Get("ft"), " ") {
-		segs := strings.Split(ft, ":")
+		segs := strings.SplitN(ft, ".", 3)
 		if len(segs) > 1 {
 			if filter, ok := filters[segs[0]]; ok {
 				filter.Handler(segs[1:], c)

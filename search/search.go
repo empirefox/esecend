@@ -84,7 +84,7 @@ func (c *Context) HandleQueryPage() {
 // HandleQueryOrder handle order from query string:
 // &ob(order)=Price:desc
 func (c *Context) HandleQueryOrder() (hasOrder bool) {
-	orders := strings.Split(c.Query.Get("ob"), ":")
+	orders := strings.Split(c.Query.Get("ob"), ".")
 	l := len(orders)
 	if l < 1 || l > 2 {
 		return
