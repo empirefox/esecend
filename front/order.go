@@ -1,6 +1,8 @@
 //go:generate reform
 package front
 
+import "github.com/empirefox/reform"
+
 type TradeState int
 
 const (
@@ -189,4 +191,9 @@ type OrderPayPayload struct {
 	OrderID  uint
 	Amount   uint
 	IsPoints bool
+}
+
+type OrdersResponse struct {
+	Orders []reform.Struct // Order
+	Items  []reform.Struct // OrderItem
 }

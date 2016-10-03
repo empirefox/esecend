@@ -49,6 +49,6 @@ func (s *Server) PostEval(c *gin.Context) {
 		return
 	}
 
-	s.DB.GetOrderItems()
+	s.DB.GetOrderItems(&order)
 	c.JSON(http.StatusOK, &order)
 }

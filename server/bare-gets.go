@@ -244,12 +244,6 @@ func (s *Server) GetAddrs(c *gin.Context) {
 	ResponseArray(c, data, err)
 }
 
-func (s *Server) GetOrders(c *gin.Context) {
-	tokUsr := s.TokenUser(c)
-	data, err := s.DB.GetDB().FindAllFrom(front.OrderTable, "$UserID", tokUsr.ID)
-	ResponseArray(c, data, err)
-}
-
 func (s *Server) GetNewsItem(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	if id == 0 {

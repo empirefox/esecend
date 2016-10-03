@@ -36,6 +36,7 @@ type Server struct {
 
 	NewsResource    *search.Resource
 	ProductResource *search.Resource
+	OrderResource   *search.Resource
 }
 
 func (s *Server) BuildEngine() {
