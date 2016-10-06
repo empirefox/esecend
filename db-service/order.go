@@ -714,7 +714,7 @@ func (dbs *DbService) OrderChangeState(
 			if order.WxRefund == 0 {
 				order.WxRefund = order.WxPaid
 			}
-			err = dbs.orderRefund(0, tokUsr.ID, order)
+			err = dbs.orderRefund(tokUsr.ID, order)
 			if err != nil {
 				return
 			}
@@ -822,7 +822,7 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (e
 	order.CashRefund = claims.CashRefund
 	order.WxRefund = claims.WxRefund
 
-	err = dbs.orderRefund(claims.AdminId, claims.UserId, order)
+	err = dbs.orderRefund(order.UserID, order)
 	if err == nil {
 		err = db.UpdateColumns(order, refundCol, "CashRefund", "WxRefund", "State", "WxRefundID")
 	} else {
@@ -832,20 +832,20 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (e
 }
 
 // called just before commit of tx
-func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order) (err error) {
+func (dbs *DbService) orderRefund(userId uint, order *front.Order) (err error) {
 	db := dbs.GetDB()
 	now := time.Now().Unix()
 
 	if order.CashRefund != 0 {
 		var flow front.UserCash
-		ds := dbs.DS.Where(goqu.I("$OrderID").Eq(order.ID)).Where(goqu.I("$Type").Eq(front.TUserCashRefund))
+		ds := dbs.DS.Where(goqu.I("$OrderID").Eq(userId)).Where(goqu.I("$Type").Eq(front.TUserCashRefund))
 		if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
 			return
 		}
 		if flow.ID == 0 {
 			// not refund yet
 			var flow1 front.UserCash
-			ds = dbs.DS.Where(goqu.I("$UserID").Eq(userId)).Order(goqu.I("$CreatedAt").Desc())
+			ds = dbs.DS.Where(goqu.I("$UserID").Eq(order.UserID)).Order(goqu.I("$CreatedAt").Desc())
 			if err = db.DsSelectOneTo(&flow1, ds); err != nil {
 				return
 			}
@@ -866,10 +866,7 @@ func (dbs *DbService) orderRefund(adminId, userId uint, order *front.Order) (err
 
 	if order.WxRefund != 0 {
 		var res map[string]string
-		if adminId == 0 {
-			adminId = userId
-		}
-		res, err = dbs.wc.OrderRefund(order, strconv.Itoa(int(adminId)))
+		res, err = dbs.wc.OrderRefund(order)
 		if err != nil {
 			return
 		}

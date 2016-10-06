@@ -1,6 +1,8 @@
 //go:generate reform
 package front
 
+import "github.com/empirefox/reform"
+
 type VipRebateType int
 
 const (
@@ -32,7 +34,7 @@ type VipIntro struct {
 //reform:cc_vip_rebate_origin
 type VipRebateOrigin struct {
 	ID        uint  `reform:"id,pk"`
-	UserID    uint  `reform:"user_id" json:"-"`
+	UserID    uint  `reform:"user_id"`
 	CreatedAt int64 `reform:"created_at"`
 	NotBefore int64 `reform:"nbf"`
 	ExpiresAt int64 `reform:"exp"`
@@ -51,4 +53,15 @@ func (vip *VipRebateOrigin) Valid(now int64) bool {
 type VipRebatePayload struct {
 	Type   VipRebateType
 	SubIDs []uint
+}
+
+//reform:cc_member
+type VipName struct {
+	ID       uint   `reform:"id,pk"`
+	Nickname string `reform:"name"`
+}
+
+type QualificationsResponse struct {
+	Items []reform.Struct // VipRebateOrigin
+	Names []reform.Struct // VipName
 }

@@ -121,7 +121,7 @@ func (wc *WxClient) OrderClose(order *front.Order) (map[string]string, error) {
 	return pay.CloseOrder(wc.Client, req)
 }
 
-func (wc *WxClient) OrderRefund(order *front.Order, opUserId string) (map[string]string, error) {
+func (wc *WxClient) OrderRefund(order *front.Order) (map[string]string, error) {
 	req := map[string]string{
 		"appid":         wc.wx.AppId,
 		"mch_id":        wc.wx.MchId,
@@ -130,7 +130,7 @@ func (wc *WxClient) OrderRefund(order *front.Order, opUserId string) (map[string
 		"out_refund_no": order.TrackingNumber(),
 		"total_fee":     strconv.Itoa(int(order.WxPaid)),
 		"refund_fee":    strconv.Itoa(int(order.WxRefund)),
-		"op_user_id":    opUserId,
+		"op_user_id":    wc.wx.MchId,
 	}
 	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
 	return pay.Refund(wc.Client, req)

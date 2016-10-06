@@ -56,6 +56,8 @@ func (s *Server) BuildEngine() {
 	}))
 	router.Use(corsMiddleWare)
 
+	router.GET("/faketoken", s.GetFakeToken)
+
 	router.POST(s.Config.Security.WxOauthPath, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
 

@@ -1,8 +1,6 @@
 //go:generate reform
 package front
 
-import "github.com/empirefox/reform"
-
 //reform:cc_member
 type MyFan struct {
 	ID           uint   `reform:"id,pk"`
@@ -10,9 +8,4 @@ type MyFan struct {
 	Nickname     string `reform:"name"`
 	HeadImageURL string `reform:"avatar"`
 	User1        uint   `reform:"parent_id"`
-}
-
-type MyFansResponse struct {
-	Stores []reform.Struct // Store
-	Fans   []reform.Struct // MyFan, alias of models.User
 }

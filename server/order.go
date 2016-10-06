@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -87,6 +88,7 @@ func (s *Server) GetMgrOrderState(c *gin.Context) {
 	var order front.Order
 	err := s.OrderHub.MgrOrderState(&order, claims)
 	if Abort(c, err) {
+		fmt.Println("MustAdmin", err)
 		return
 	}
 

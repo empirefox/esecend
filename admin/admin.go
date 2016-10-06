@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/dgrijalva/jwt-go"
@@ -13,8 +14,6 @@ import (
 
 type Claims struct {
 	jwt.StandardClaims
-	AdminId uint `json:"aid"`
-	UserId  uint `json:"uid"`
 	OrderID uint `json:"oid"`
 
 	State front.OrderState `json:"state,omitempty"`
@@ -43,7 +42,7 @@ func (a *Admin) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
 	}
 
 	claims := tok.Claims.(*Claims)
-	if claims.ExpiresAt == 0 || claims.ExpiresAt-claims.IssuedAt > 30 {
+	if claims.ExpiresAt == 0 || claims.ExpiresAt-claims.IssuedAt > 60 {
 		return nil, cerr.InvalidTokenExpires
 	}
 	return []byte(a.conf.AdminKey), nil
@@ -52,6 +51,7 @@ func (a *Admin) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
 func (a *Admin) ParseToken(req *http.Request) (*jwt.Token, error) {
 	tok, err := request.ParseFromRequestWithClaims(req, request.OAuth2Extractor, &Claims{}, a.FindKeyfunc)
 	if err != nil {
+		fmt.Println("ParseToken", err)
 		return nil, cerr.NoAccessToken
 	}
 	if !tok.Valid {

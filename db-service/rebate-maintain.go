@@ -37,6 +37,9 @@ func (s *DbService) RebateMaintain() error {
 
 	now := time.Now().Unix()
 	for _, rebate := range rebates {
+		if rebate.Stages == 0 {
+			continue
+		}
 		createdAt := time.Unix(rebate.CreatedAt, 0)
 		litems := len(rebate.Items)
 		next := createdAt.AddDate(0, litems+1, 0).Unix()

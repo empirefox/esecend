@@ -75,20 +75,12 @@ func (s *Server) GetMyFans(c *gin.Context) {
 	db := s.DB.GetDB()
 	tokUsr := s.TokenUser(c)
 
-	stores, err := db.FindAllFrom(front.StoreTable, "$User1", tokUsr.ID)
-	if AbortWithoutNoRecord(c, err) {
-		return
-	}
-
 	fans, err := db.FindAllFrom(front.MyFanTable, "$User1", tokUsr.ID)
 	if AbortWithoutNoRecord(c, err) {
 		return
 	}
 
-	c.JSON(http.StatusOK, &front.MyFansResponse{
-		Stores: stores,
-		Fans:   fans,
-	})
+	c.JSON(http.StatusOK, fans)
 }
 
 func (s *Server) GetMyVips(c *gin.Context) {
@@ -113,7 +105,23 @@ func (s *Server) GetMyQualifications(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, vips)
+	var ids []interface{}
+	for _, vip := range vips {
+		ids = append(ids, vip.(*front.VipRebateOrigin).ID)
+	}
+
+	var names []reform.Struct
+	if len(ids) != 0 {
+		names, err = db.FindAllFromPK(front.VipNameTable, ids...)
+		if AbortWithoutNoRecord(c, err) {
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, &front.QualificationsResponse{
+		Items: vips,
+		Names: names,
+	})
 }
 
 func (s *Server) GetEvals(c *gin.Context) {
