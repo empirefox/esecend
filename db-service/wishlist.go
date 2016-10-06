@@ -6,7 +6,6 @@ import (
 
 	"gopkg.in/doug-martin/goqu.v3"
 
-	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/reform"
 )
@@ -26,14 +25,11 @@ func (dbs *DbService) WishlistSave(userId uint, payload *front.WishlistSavePaylo
 
 		// update first
 		ra, err := db.DsUpdateStruct(data, ds)
-		if err == reform.ErrNoRows {
-			return db.Insert(data)
-		}
 		if err != nil {
 			return err
 		}
 		if ra == 0 {
-			return cerr.DbFailed
+			return db.Insert(data)
 		}
 		table := front.WishItemTable
 		query, args, err := ds.From(table.Name()).Select(table.PK()).Limit(1).ToSql()

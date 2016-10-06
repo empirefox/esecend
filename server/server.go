@@ -62,6 +62,7 @@ func (s *Server) BuildEngine() {
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
 
 	router.GET("/profile", s.GetProfile)
+	router.GET("/store", s.GetTableAll(front.StoreTable))
 	router.GET("/carousel", s.GetTableAll(front.CarouselItemTable))
 	router.GET("/evals/:product_id", s.GetEvals)
 	router.GET("/category", s.GetTableAll(front.CategoryTable))

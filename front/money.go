@@ -16,6 +16,7 @@ const (
 	TUserCashReward
 	TUserCashRebate
 	TUserCashStoreRebate
+	TUserCashRecharge
 )
 
 //reform:cc_member_account_log
