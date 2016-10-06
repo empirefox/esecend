@@ -648,9 +648,10 @@ func (dbs *DbService) PayOrder(tokUsr *models.User, payload *front.OrderPayPaylo
 		err = cerr.InvalidPayType
 	}
 
-	if err != nil {
+	if err == nil {
 		o = &order
 	}
+
 	return
 }
 

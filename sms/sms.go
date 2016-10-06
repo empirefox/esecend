@@ -78,14 +78,16 @@ func (s *sender) Send(prefix string, userId uint, phone string) error {
 	}
 	s.cache.Set(key, &lcode, cache.DefaultExpiration)
 
-	res, err := alidayu.SendOnce(phone, s.config.SignName, s.config.Template, fmt.Sprintf(`{"code":"%s"}`, lcode.Code))
-	if err != nil {
-		return cerr.SendSmsError
-	}
+	// TODO change back after test
+	//	res, err := alidayu.SendOnce(phone, s.config.SignName, s.config.Template, fmt.Sprintf(`{"code":"%s"}`, lcode.Code))
+	fmt.Println("phone:", phone, "sent code:", lcode.Code)
+	//	if err != nil {
+	//		return cerr.SendSmsError
+	//	}
 
-	if !res.Success {
-		return cerr.SendSmsFailed
-	}
+	//	if !res.Success {
+	//		return cerr.SendSmsFailed
+	//	}
 
 	return nil
 }

@@ -54,7 +54,7 @@ func (dbs *DbService) WishlistSave(userId uint, payload *front.WishlistSavePaylo
 }
 
 func (dbs *DbService) WishlistDel(userId, id uint) error {
-	ds := dbs.DS.Where(goqu.I("$UserID").Eq(userId), goqu.I(front.WishItemTable.PK()).Eq(id))
+	ds := dbs.DS.Where(goqu.I("$UserID").Eq(userId), goqu.I("$ProductID").Eq(id))
 	_, err := dbs.GetDB().DsDelete(front.WishItemTable, ds)
 	return err
 }

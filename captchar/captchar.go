@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image/color"
 	"image/png"
+	"strings"
 	"time"
 
 	"github.com/afocus/captcha"
@@ -58,7 +59,7 @@ func NewCaptchar(font string) (Captchar, error) {
 }
 
 func (c *captchar) New(userId uint) (*front.Captcha, error) {
-	img, value := c.cap.Create(6, captcha.ALL)
+	img, value := c.cap.Create(4, captcha.ALL)
 
 	var b bytes.Buffer
 	b.WriteByte('"')
@@ -70,7 +71,7 @@ func (c *captchar) New(userId uint) (*front.Captcha, error) {
 	b.WriteByte('"')
 
 	key := uniuri.New()
-	for c.capCache.Add(key, fmt.Sprintln("%d:%s", userId, value), cache.DefaultExpiration) != nil {
+	for c.capCache.Add(key, fmt.Sprintln("%d:%s", userId, strings.ToLower(value)), cache.DefaultExpiration) != nil {
 		key = uniuri.NewLen(20)
 	}
 
@@ -86,5 +87,5 @@ func (c *captchar) Verify(userId uint, key, value string) bool {
 	if ok {
 		c.capCache.Delete(key)
 	}
-	return ok && fact.(string) == fmt.Sprintln("%d:%s", userId, value)
+	return ok && fact.(string) == fmt.Sprintln("%d:%s", userId, strings.ToLower(value))
 }
