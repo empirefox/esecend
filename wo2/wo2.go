@@ -101,7 +101,7 @@ func (a *Auther) loadDefault() {
 
 func (a *Auther) authHandle(c *gin.Context) error {
 	raw, _ := ioutil.ReadAll(c.Request.Body)
-	log.WithFields(l.Locate(logrus.Fields{})).Debugf("Code Body:%s", raw)
+	log.WithFields(l.Locate(logrus.Fields{})).Infof("Code Body:%s", raw)
 	code, err := jsonparser.GetUnsafeString(raw, "code")
 	if err != nil {
 		return err

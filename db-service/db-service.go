@@ -137,6 +137,7 @@ func (dbs *DbService) clone() *DbService {
 		db:      dbs.db,
 		DS:      dbs.DS,
 		isDebug: dbs.isDebug,
+		profile: dbs.profile,
 	}
 }
 

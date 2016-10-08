@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/empirefox/esecend/config"
@@ -22,40 +23,54 @@ func NewOrderHub(config *config.Config, dbs *dbsrv.DbService) *OrderHub {
 	}
 }
 
+func (hub *OrderHub) run(input interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	switch in := input.(type) {
+	case *prepayOrderInput:
+		hub.onPrepayOrder(in)
+
+	case *payOrderInput:
+		hub.onPayOrder(in)
+
+	case *orderPaidStateInput:
+		hub.onOrderPaidState(in)
+
+	case *orderOnWxPayNotifyInput:
+		hub.onWxPayNotify(in)
+
+	case *orderChangeStateInput:
+		hub.onOrderChangeState(in)
+
+	case *orderMgrStateInput:
+		hub.onMgrOrderState(in)
+
+	case *orderEvalInput:
+		hub.onEvalSave(in)
+
+	case *userVipRebateInput:
+		hub.onUserVipRebate(in)
+
+	case *userWithdrawInput:
+		hub.onUserWithdraw(in)
+
+	default:
+		glog.Errorf("cannot handle input: %#v\n", in)
+	}
+}
+
 func (hub *OrderHub) Run() {
 	ticker := time.NewTicker(time.Duration(hub.config.MaintainTimeMinute) * time.Minute)
 	defer func() {
 		ticker.Stop()
 	}()
-
 	for {
 		select {
 		case input := <-hub.chanInput:
-			switch in := input.(type) {
-			case *prepayOrderInput:
-				hub.onPrepayOrder(in)
-
-			case *payOrderInput:
-				hub.onPayOrder(in)
-
-			case *orderPaidStateInput:
-				hub.onOrderPaidState(in)
-
-			case *orderOnWxPayNotifyInput:
-				hub.onWxPayNotify(in)
-
-			case *orderChangeStateInput:
-				hub.onOrderChangeState(in)
-
-			case *orderMgrStateInput:
-				hub.onMgrOrderState(in)
-
-			case *orderEvalInput:
-				hub.onEvalSave(in)
-
-			default:
-				glog.Errorf("cannot handle input: %#v\n", in)
-			}
+			hub.run(input)
 
 		case <-ticker.C:
 			hub.onMaintain()

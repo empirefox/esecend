@@ -53,8 +53,11 @@ func (dbs *DbService) WishlistSave(userId uint, payload *front.WishlistSavePaylo
 	return data, nil
 }
 
-func (dbs *DbService) WishlistDel(userId, id uint) error {
-	ds := dbs.DS.Where(goqu.I("$UserID").Eq(userId), goqu.I("$ProductID").Eq(id))
+func (dbs *DbService) WishlistDel(userId uint, ids []uint) error {
+	ds := dbs.DS.Where(goqu.I("$UserID").Eq(userId))
+	if len(ids) != 0 {
+		ds = ds.Where(goqu.I("$ProductID").In(ids))
+	}
 	_, err := dbs.GetDB().DsDelete(front.WishItemTable, ds)
 	return err
 }

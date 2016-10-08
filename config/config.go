@@ -9,7 +9,7 @@ type Security struct {
 	TokenLife     int64         `default:"60"` // 60 minute
 	RefreshIn     int64         `default:"5"`  // last 5 minute
 	PayNotifyPath string        `default:"/wxpay"`
-	WxOauthPath   string        `default:"/oauth/wx"`
+	WxOauthPath   string        `default:"/oauth/wechat"`
 	ExpiresMinute time.Duration `default:"61"`
 	ClearsMinute  time.Duration `default:"10"`
 	SecendOrigin  string        // without '/'

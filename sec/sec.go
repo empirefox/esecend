@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	mpoauth2 "github.com/chanxuehong/wechat.v2/mp/oauth2"
+	"github.com/golang/glog"
 
 	"github.com/dchest/uniuri"
 	"github.com/delaemon/sonyflake"
@@ -69,6 +70,7 @@ func (h *Handler) Login(userinfo *mpoauth2.UserInfo, user1 uint) (interface{}, e
 			HeadImageURL: userinfo.HeadImageURL, // TODO Save to our cdn
 			User1:        user1,
 		}
+		glog.Errorln(usr, userinfo.Nickname)
 		err = db.Insert(&usr)
 	} else if err == nil {
 		usr.RefreshToken = &encRefreshToken

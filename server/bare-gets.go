@@ -139,6 +139,25 @@ func (s *Server) GetEvals(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
+func (s *Server) GetSkus(c *gin.Context) {
+	productId, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if productId == 0 {
+		front.NewCodev(cerr.InvalidUrlParam).Abort(c, http.StatusBadRequest)
+		return
+	}
+
+	product := &front.Product{ID: uint(productId)}
+	data, err := s.DB.ProductsFillResponse(product)
+	if Abort(c, err) {
+		return
+	}
+
+	c.JSON(http.StatusOK, &front.SkusResponse{
+		Skus:  data.Skus,
+		Attrs: data.Attrs,
+	})
+}
+
 func (s *Server) GetProductAttrs(c *gin.Context) {
 	db := s.DB.GetDB()
 	attrs, err := db.SelectAllFrom(front.ProductAttrTable, "")
@@ -185,7 +204,8 @@ func (s *Server) GetGroupBuy(c *gin.Context) {
 
 func (s *Server) GetWishlist(c *gin.Context) {
 	db := s.DB.GetDB()
-	items, err := db.SelectAllFrom(front.WishItemTable, "")
+	tokUsr := s.TokenUser(c)
+	items, err := db.FindAllFrom(front.WishItemTable, "$UserID", tokUsr.ID)
 	if AbortEmptyStructsWithNull(c, items, err) {
 		return
 	}

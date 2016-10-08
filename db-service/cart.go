@@ -32,14 +32,11 @@ func (dbs *DbService) CartItemSave(userId uint, payload *front.SaveToCartPayload
 
 		// update first
 		ra, err := db.DsUpdateStruct(data, ds)
-		if err == reform.ErrNoRows {
-			return db.Insert(data)
-		}
 		if err != nil {
 			return err
 		}
 		if ra == 0 {
-			return cerr.DbFailed
+			return db.Insert(data)
 		}
 		table := front.CartItemTable
 		query, args, err := ds.From(table.Name()).Select(table.PK()).Limit(1).ToSql()

@@ -56,9 +56,11 @@ func (s *Server) BuildEngine() {
 	}))
 	router.Use(corsMiddleWare)
 
-	router.GET("/faketoken", s.GetFakeToken)
+	if s.IsDevMode {
+		router.GET("/faketoken", s.GetFakeToken)
+	}
 
-	router.POST(s.Config.Security.WxOauthPath, s.Ok)
+	router.POST(s.Config.Security.WxOauthPath, auth, s.Ok)
 	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
 
 	router.GET("/profile", s.GetProfile)
@@ -70,6 +72,7 @@ func (s *Server) BuildEngine() {
 	router.GET("/product/bundle/:matrix", s.GetProductsBundle)
 	router.GET("/product/1/:id", s.GetProduct)
 	router.GET("/product/attrs", s.GetProductAttrs)
+	router.GET("/product/skus/:id", s.GetSkus)
 	router.GET("/groupbuy", s.GetGroupBuy)
 	router.GET("/vips", s.GetVipIntros)
 	router.GET("/news", s.GetNews)
@@ -90,8 +93,8 @@ func (s *Server) BuildEngine() {
 	router.GET("/paykey/preset", auth, mustAuthed, s.GetPresetPaykey)
 	router.POST("/paykey/set", auth, mustAuthed, s.PostSetPaykey)
 	router.GET("/wishlist", auth, mustAuthed, s.GetWishlist)
-	router.POST("/wishlist_add", auth, mustAuthed, s.PostWishlistAdd)
-	router.DELETE("/wishlist/:id", auth, mustAuthed, s.DeleteWishItem)
+	router.POST("/wishlist", auth, mustAuthed, s.PostWishlistAdd)
+	router.DELETE("/wishlist", auth, mustAuthed, s.DeleteWishlistItems)
 	router.GET("/wallet", auth, mustAuthed, s.GetWallet)
 	router.GET("/orders", auth, mustAuthed, s.GetOrders)
 	router.POST("/checkout", auth, mustAuthed, s.PostCheckout)
@@ -137,5 +140,8 @@ func (s *Server) BuildEngine() {
 func (s *Server) StartRun() error {
 	go s.ProductHub.Run()
 	go s.OrderHub.Run()
-	return s.Run(paas.BindAddr)
+	if s.IsDevMode {
+		return s.Run(paas.BindAddr)
+	}
+	return s.RunTLS(paas.BindAddr, "./1_api.silu333.com_bundle.crt", "./silu333_private.key")
 }

@@ -18,7 +18,7 @@ var (
 	NullJson        = json.RawMessage("null")
 )
 
-func (s *Server) Ok(c *gin.Context)       { c.AbortWithStatus(http.StatusOK) }
+func (s *Server) Ok(c *gin.Context)       {}
 func (s *Server) NotFound(c *gin.Context) { c.AbortWithStatus(http.StatusNotFound) }
 
 func ResponseArray(c *gin.Context, data interface{}, err error) {

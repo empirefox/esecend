@@ -11,6 +11,7 @@ import (
 	"github.com/empirefox/esecend/models"
 	"github.com/empirefox/gotool/paas"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 	"github.com/itsjamie/gin-cors"
 )
 
@@ -79,8 +80,10 @@ func (s *Server) HasToken(c *gin.Context) {
 }
 
 func (s *Server) MustAdmin(c *gin.Context) {
+	glog.Errorln(c.Request.URL.Path)
 	tok, err := s.Admin.ParseToken(c.Request)
 	if Abort(c, err) {
+		glog.Errorln(err)
 		return
 	}
 	c.Set(s.Admin.GinAdminKey, tok.Claims)

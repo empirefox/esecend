@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 
+	"gopkg.in/doug-martin/goqu.v3"
+
 	"github.com/empirefox/esecend/front"
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +15,8 @@ func (s *Server) GetNews(c *gin.Context) {
 }
 
 func (s *Server) GetOrders(c *gin.Context) {
-	orders, err := s.OrderResource.NewSearcher(c).FindMany()
+	ds := s.OrderResource.Dbs.DS.Where(goqu.I("$UserID").Eq(s.TokenUser(c).ID))
+	orders, err := s.OrderResource.NewSearcherFromDS(c, ds).FindMany()
 	if AbortEmptyStructsWithNull(c, orders, err) {
 		return
 	}

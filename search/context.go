@@ -34,6 +34,15 @@ func (res *Resource) NewSearcher(context *gin.Context) *Context {
 	return c
 }
 
+func (res *Resource) NewSearcherFromDS(context *gin.Context, ds *goqu.Dataset) *Context {
+	c := &Context{
+		Resource: res,
+		DS:       ds,
+		Query:    context.Request.URL.Query(),
+	}
+	return c
+}
+
 func (res *Resource) NewSearcherFromRaw(rawQuery string) *Context {
 	query, _ := url.ParseQuery(rawQuery)
 	c := &Context{
