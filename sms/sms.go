@@ -36,11 +36,10 @@ type sender struct {
 	codeChars []byte
 }
 
-func NewSender(config *config.Config, isDebug bool) Sender {
+func NewSender(config *config.Config) Sender {
 	dayu := &config.Alidayu
 	alidayu.Appkey = dayu.Appkey
 	alidayu.AppSecret = dayu.AppSecret
-	alidayu.IsDebug = isDebug
 	return &sender{
 		config:    dayu,
 		cache:     cache.New(dayu.ExpiresMinute*time.Minute, dayu.ClearsMinute*time.Minute),
@@ -87,6 +86,7 @@ func (s *sender) Send(prefix string, userId uint, phone string) error {
 	}
 
 	if !res.Success {
+		glog.Errorln(*res.ResultError)
 		return cerr.SendSmsFailed
 	}
 
