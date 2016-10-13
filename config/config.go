@@ -8,7 +8,6 @@ type Security struct {
 	SignAlg       string        `default:"HS256"`
 	TokenLife     int64         `default:"60"` // 60 minute
 	RefreshIn     int64         `default:"5"`  // last 5 minute
-	PayNotifyPath string        `default:"/wxpay"`
 	WxOauthPath   string        `default:"/oauth/wechat"`
 	ExpiresMinute time.Duration `default:"61"`
 	ClearsMinute  time.Duration `default:"10"`
@@ -41,6 +40,7 @@ type Weixin struct {
 	WebScope       string `default:"snsapi_base"`
 	AppId          string
 	ApiKey         string
+	MchKey         string
 	MchId          string
 	CertFile       string
 	KeyFile        string

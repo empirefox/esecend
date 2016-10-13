@@ -72,10 +72,26 @@ func (s *Server) TokenUser(c *gin.Context) *models.User {
 	return c.Keys[s.Auther.GinUserKey].(*models.User)
 }
 
+var NotClaimErr = jwt.ValidationErrorMalformed |
+	jwt.ValidationErrorUnverifiable |
+	jwt.ValidationErrorSignatureInvalid
+
 func (s *Server) HasToken(c *gin.Context) {
-	_, ok := c.Keys[s.Auther.GinJwtKey]
-	if !ok {
+	itok, ok := c.Keys[s.Auther.GinJwtKey]
+	if !ok || itok == nil {
 		front.NewCodev(cerr.NoAccessToken).Abort(c, http.StatusUnauthorized)
+	}
+	_, ok = itok.(*jwt.Token)
+	if !ok {
+		front.NewCodev(cerr.Unauthorized).Abort(c, http.StatusUnauthorized)
+	}
+
+	if err, ok := c.Keys[s.Auther.GinTokErrKey]; ok {
+		if verr, ok := err.(*jwt.ValidationError); ok {
+			if verr.Errors&NotClaimErr != 0 {
+				front.NewCodev(cerr.NoAccessToken).Abort(c, http.StatusUnauthorized)
+			}
+		}
 	}
 }
 

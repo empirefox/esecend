@@ -119,6 +119,7 @@ type Order struct {
 	WxTransactionId string     `reform:"wx_transaction_id" json:"-"`
 	WxTradeState    TradeState `reform:"wx_trade_state"    json:"-"`
 	WxRefundID      string     `reform:"wx_refund_id"      json:"-"`
+	WxTradeNo       string     `reform:"wx_trade_no"       json:"-"`
 
 	// Invoice
 	InvoiceTo    string `reform:"invoice_to"`

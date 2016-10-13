@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/cznic/sortutil"
+	"github.com/dchest/uniuri"
 	"github.com/empirefox/esecend/admin"
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
@@ -157,6 +158,7 @@ func (dbs *DbService) CheckoutOrderOne(
 		if err != nil && err != reform.ErrNoRows {
 			return nil, err
 		}
+		err = nil
 		store1 = store.User1
 	}
 
@@ -439,6 +441,7 @@ func (dbs *DbService) CheckoutOrder(tokUsr *models.User, payload *front.Checkout
 				if err != nil && err != reform.ErrNoRows {
 					return nil, err
 				}
+				err = nil
 				store1Map[product.StoreID] = store.User1
 				item.Store1 = store.User1
 			}
@@ -481,7 +484,8 @@ func (dbs *DbService) PrepayOrder(tokUsr *models.User, orderId uint, ip *string)
 	now := time.Now().Unix()
 
 	// prepay after prepaid
-	if order.State == front.TOrderStatePrepaid {
+	if order.State == front.TOrderStatePrepaid && order.PrepaidAt != 0 {
+		glog.Errorln("order.State == front.TOrderStatePrepaid")
 		durPrepaid := now - order.PrepaidAt
 		if durPrepaid < 290 {
 			o = &order
@@ -495,6 +499,7 @@ func (dbs *DbService) PrepayOrder(tokUsr *models.User, orderId uint, ip *string)
 		// close transaction_id first
 		var res map[string]string
 		res, err = dbs.wc.OrderClose(&order)
+		glog.Errorln(err)
 		if err != nil {
 			return
 		}
@@ -526,19 +531,21 @@ func (dbs *DbService) PrepayOrder(tokUsr *models.User, orderId uint, ip *string)
 		return
 	}
 
+	order.PrepaidAt = now
+	order.WxTradeNo = uniuri.NewLen(16)
 	var preid *string
 	preid, args, err = dbs.wc.UnifiedOrder(tokUsr, &order, ip)
+	glog.Errorln(err)
 	if err != nil {
 		return
 	}
 
 	order.WxPrepayID = *preid
 	order.State = front.TOrderStatePrepaid
-	order.PrepaidAt = now
 	order.WxTransactionId = ""
 	order.WxTradeState = front.UNKNOWN
 
-	err = db.UpdateColumns(&order, "State", "PrepaidAt", "WxTransactionId", "WxTradeState", "WxPrepayID")
+	err = db.UpdateColumns(&order, "WxTradeNo", "State", "PrepaidAt", "WxTransactionId", "WxTradeState", "WxPrepayID")
 	if err == nil {
 		o = &order
 	}
@@ -692,7 +699,12 @@ func (dbs *DbService) OrderChangeState(
 			if res["result_code"] != "SUCCESS" {
 				switch res["err_code"] {
 				case "ORDERPAID":
-					err = cerr.WxOrderAlreadyPaid
+					//					err = cerr.WxOrderAlreadyPaid
+					order.State = front.TOrderStatePaid
+					order.PaidAt = now
+					order.WxTradeState = front.SUCCESS
+					err = db.UpdateColumns(order, "State", "PaidAt", "WxTradeState")
+					return
 				case "SYSTEMERROR":
 					err = cerr.WxSystemFailed
 				case "SIGNERROR", "REQUIRE_POST_METHOD", "XML_FORMAT_ERROR":
@@ -822,6 +834,10 @@ func (dbs *DbService) MgrOrderState(order *front.Order, claims *admin.Claims) (e
 	// refund
 	order.CashRefund = claims.CashRefund
 	order.WxRefund = claims.WxRefund
+	if order.CashRefund+order.WxRefund > order.PayAmount {
+		err = cerr.InvalidPayAmount
+		return
+	}
 
 	err = dbs.orderRefund(order.UserID, order)
 	if err == nil {
@@ -843,6 +859,7 @@ func (dbs *DbService) orderRefund(userId uint, order *front.Order) (err error) {
 		if err = db.DsSelectOneTo(&flow, ds); err != nil && err != reform.ErrNoRows {
 			return
 		}
+		err = nil
 		if flow.ID == 0 {
 			// not refund yet
 			var flow1 front.UserCash

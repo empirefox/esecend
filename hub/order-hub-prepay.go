@@ -23,7 +23,7 @@ func (hub *OrderHub) PrepayOrder(tokUsr *models.User, orderId uint, cip string) 
 	chanResult := make(chan *prepayOrderResult)
 	chanErr := make(chan error)
 	ip := &cip
-	in := prepayOrderInput{tokUsr, orderId, ip, chanResult, chanErr}
+	in := &prepayOrderInput{tokUsr, orderId, ip, chanResult, chanErr}
 	hub.chanInput <- in
 
 	select {

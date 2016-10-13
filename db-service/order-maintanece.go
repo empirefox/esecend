@@ -345,11 +345,12 @@ func (dbs *DbService) OrderMaintanence(order *front.Order) (cols []string, err e
 				return
 			}
 
+			points := int(order.PayAmount / 100)
 			err = db.Insert(&front.PointsItem{
 				UserID:    order.UserID,
 				CreatedAt: now,
-				Amount:    int(order.PayAmount),
-				Balance:   top.Balance + int(order.PayAmount),
+				Amount:    points,
+				Balance:   top.Balance + points,
 				OrderID:   order.ID,
 			})
 			if err != nil {

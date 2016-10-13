@@ -22,6 +22,7 @@ import (
 type Server struct {
 	*gin.Engine
 	IsDevMode  bool
+	IsTLS      bool
 	Config     *config.Config
 	Cdn        *cdn.Qiniu
 	WxClient   *wx.WxClient
@@ -57,11 +58,11 @@ func (s *Server) BuildEngine() {
 	router.Use(corsMiddleWare)
 
 	if s.IsDevMode {
-		router.GET("/faketoken", s.GetFakeToken)
+		//		router.GET("/faketoken", s.GetFakeToken)
 	}
 
 	router.POST(s.Config.Security.WxOauthPath, auth, s.Ok)
-	router.POST(s.Config.Security.PayNotifyPath, s.PostWxPayNotify)
+	router.POST(s.Config.Weixin.PayNotifyURL, s.PostWxPayNotify)
 
 	router.GET("/profile", s.GetProfile)
 	router.GET("/store", s.GetTableAll(front.StoreTable))
@@ -115,7 +116,7 @@ func (s *Server) BuildEngine() {
 	router.DELETE("/logout", auth, s.DeleteLogout)
 
 	optPathIgnore := make(map[string]bool)
-	optPathIgnore[s.Config.Security.PayNotifyPath] = true
+	optPathIgnore[s.Config.Weixin.PayNotifyURL] = true
 	rs := router.Routes()
 	for _, r := range rs {
 		if r.Method == "OPTIONS" {
@@ -140,8 +141,8 @@ func (s *Server) BuildEngine() {
 func (s *Server) StartRun() error {
 	go s.ProductHub.Run()
 	go s.OrderHub.Run()
-	if s.IsDevMode {
-		return s.Run(paas.BindAddr)
+	if s.IsTLS {
+		return s.RunTLS(paas.BindAddr, "./1_api.silu333.com_bundle.crt", "./silu333_private.key")
 	}
-	return s.RunTLS(paas.BindAddr, "./1_api.silu333.com_bundle.crt", "./silu333_private.key")
+	return s.Run(paas.BindAddr)
 }

@@ -186,7 +186,7 @@ func (h *Handler) FindKeyfunc(tok *jwt.Token) (interface{}, error) {
 func (h *Handler) ParseToken(req *http.Request) (tok *jwt.Token, tokUsr interface{}, err error) {
 	tok, err = request.ParseFromRequestWithClaims(req, request.OAuth2Extractor, &front.TokenClaims{}, h.FindKeyfunc)
 	if err != nil {
-		return nil, nil, err
+		return tok, nil, err
 	}
 
 	claims := tok.Claims.(*front.TokenClaims)

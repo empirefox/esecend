@@ -31,8 +31,9 @@ type SecurityHandler interface {
 }
 
 type Auther struct {
-	GinJwtKey  string `default:"claims"`
-	GinUserKey string `default:"tokUser"`
+	GinJwtKey    string `default:"claims"`
+	GinUserKey   string `default:"tokUser"`
+	GinTokErrKey string `default:"tokErr"`
 
 	Oauth2HttpClient      *http.Client
 	GetUserInfoHttpClient *http.Client
@@ -75,17 +76,30 @@ func (a *Auther) Middleware(iuser ...interface{}) gin.HandlerFunc {
 			}
 		} else {
 			tok, tokUsr, err := a.secHandler.ParseToken(c.Request)
-			if err == nil {
+			if tok != nil {
 				c.Set(a.GinJwtKey, tok)
+			}
+			if tokUsr != nil {
 				c.Set(a.GinUserKey, tokUsr)
+			}
+			if err != nil {
+				c.Set(a.GinTokErrKey, err)
 			}
 		}
 	}
 }
 
 func (a *Auther) MustAuthed(c *gin.Context) {
-	tok, ok := c.Keys[a.GinJwtKey]
-	if !ok || !tok.(*jwt.Token).Valid {
+	itok, ok := c.Keys[a.GinJwtKey]
+	if !ok || itok == nil {
+		front.NewCodev(cerr.Unauthorized).Abort(c, http.StatusUnauthorized)
+	}
+	tok, ok := itok.(*jwt.Token)
+	if !ok || !tok.Valid {
+		front.NewCodev(cerr.Unauthorized).Abort(c, http.StatusUnauthorized)
+	}
+	_, ok = c.Keys[a.GinTokErrKey]
+	if ok {
 		front.NewCodev(cerr.Unauthorized).Abort(c, http.StatusUnauthorized)
 	}
 }

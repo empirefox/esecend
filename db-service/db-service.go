@@ -134,6 +134,7 @@ func (dbs *DbService) RollbackIfNeeded() error {
 func (dbs *DbService) clone() *DbService {
 	return &DbService{
 		config:  dbs.config,
+		wc:      dbs.wc,
 		db:      dbs.db,
 		DS:      dbs.DS,
 		isDebug: dbs.isDebug,

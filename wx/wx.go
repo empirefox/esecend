@@ -22,6 +22,7 @@ var log = logrus.New()
 
 type WxClient struct {
 	*core.Client
+	hclient   *core.Client
 	notifyUrl string
 	wx        *config.Weixin
 }
@@ -34,8 +35,9 @@ func NewWxClient(config *config.Config) (*WxClient, error) {
 	}
 	return &WxClient{
 		wx:        weixin,
-		notifyUrl: config.Security.SecendOrigin + config.Security.PayNotifyPath,
-		Client:    core.NewClient(weixin.AppId, weixin.MchId, weixin.ApiKey, httpClient),
+		notifyUrl: config.Security.SecendOrigin + weixin.PayNotifyURL,
+		Client:    core.NewClient(weixin.AppId, weixin.MchId, weixin.MchKey, httpClient),
+		hclient:   core.NewClient(weixin.AppId, weixin.MchId, weixin.MchKey, nil),
 	}, nil
 }
 
@@ -47,7 +49,7 @@ func (wc *WxClient) NewWxPayArgs(prepayId *string) *front.WxPayArgs {
 		Package:   "prepay_id=" + *prepayId, // 2hour
 		SignType:  "MD5",
 	}
-	args.PaySign = core.JsapiSign(args.AppId, args.TimeStamp, args.NonceStr, args.Package, args.SignType, wc.wx.ApiKey)
+	args.PaySign = core.JsapiSign(args.AppId, args.TimeStamp, args.NonceStr, args.Package, args.SignType, wc.wx.MchKey)
 	return args
 }
 
@@ -56,10 +58,10 @@ func (wc *WxClient) UnifiedOrder(tokUsr *models.User, order *front.Order, ip *st
 	req := &pay.UnifiedOrderRequest{
 		DeviceInfo:     "WEB",
 		Body:           wc.wx.PayBody,
-		OutTradeNo:     order.TrackingNumber(),
+		OutTradeNo:     order.WxOutTradeNo(),
 		TotalFee:       int64(order.PayAmount),
 		SpbillCreateIP: *ip,
-		NotifyURL:      wc.wx.PayNotifyURL,
+		NotifyURL:      wc.notifyUrl,
 		TradeType:      "JSAPI",
 		OpenId:         tokUsr.OpenId,
 	}
@@ -81,7 +83,7 @@ func (wc *WxClient) OnWxPayNotify(r io.Reader) (*WxResponse, map[string]string) 
 		return NewWxResponse(m["return_code"], m["return_msg"]), nil
 	}
 
-	sign := core.Sign(m, wc.wx.ApiKey, md5.New)
+	sign := core.Sign(m, wc.wx.MchKey, md5.New)
 	if sign != m["sign"] {
 		return NewWxResponse("FAIL", "failed to validate md5"), nil
 	}
@@ -99,14 +101,13 @@ func (wc *WxClient) OrderQuery(order *front.Order) (map[string]string, error) {
 	req := map[string]string{
 		"appid":        wc.wx.AppId,
 		"mch_id":       wc.wx.MchId,
-		"out_trade_no": order.TrackingNumber(),
+		"out_trade_no": order.WxOutTradeNo(),
 		"nonce_str":    uniuri.NewLen(32),
-		"notify_url":   wc.notifyUrl,
 	}
 	if order.WxTransactionId != "" {
 		req["transaction_id"] = order.WxTransactionId
 	}
-	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
+	req["sign"] = core.Sign(req, wc.wx.MchKey, md5.New)
 	return pay.OrderQuery(wc.Client, req)
 }
 
@@ -114,10 +115,10 @@ func (wc *WxClient) OrderClose(order *front.Order) (map[string]string, error) {
 	req := map[string]string{
 		"appid":        wc.wx.AppId,
 		"mch_id":       wc.wx.MchId,
-		"out_trade_no": order.TrackingNumber(),
+		"out_trade_no": order.WxOutTradeNo(),
 		"nonce_str":    uniuri.NewLen(32),
 	}
-	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
+	req["sign"] = core.Sign(req, wc.wx.MchKey, md5.New)
 	return pay.CloseOrder(wc.Client, req)
 }
 
@@ -126,13 +127,13 @@ func (wc *WxClient) OrderRefund(order *front.Order) (map[string]string, error) {
 		"appid":         wc.wx.AppId,
 		"mch_id":        wc.wx.MchId,
 		"nonce_str":     uniuri.NewLen(32),
-		"out_trade_no":  order.TrackingNumber(),
-		"out_refund_no": order.TrackingNumber(),
+		"out_trade_no":  order.WxOutTradeNo(),
+		"out_refund_no": order.WxOutTradeNo(),
 		"total_fee":     strconv.Itoa(int(order.WxPaid)),
 		"refund_fee":    strconv.Itoa(int(order.WxRefund)),
 		"op_user_id":    wc.wx.MchId,
 	}
-	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
+	req["sign"] = core.Sign(req, wc.wx.MchKey, md5.New)
 	return pay.Refund(wc.Client, req)
 }
 
@@ -156,7 +157,7 @@ func (wc *WxClient) Transfers(args *TransfersArgs) (map[string]string, error) {
 		"desc":             args.Desc,
 		"spbill_create_ip": args.Ip,
 	}
-	req["sign"] = core.Sign(req, wc.wx.ApiKey, md5.New)
+	req["sign"] = core.Sign(req, wc.wx.MchKey, md5.New)
 	return promotion.Transfers(wc.Client, req)
 }
 

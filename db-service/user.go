@@ -5,6 +5,7 @@ import (
 
 	"gopkg.in/doug-martin/goqu.v3"
 
+	"github.com/chanxuehong/wechat.v2/mch/core"
 	"github.com/empirefox/esecend/cerr"
 	"github.com/empirefox/esecend/front"
 	"github.com/empirefox/esecend/models"
@@ -88,6 +89,9 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 	}
 
 	result, err := dbs.wc.Transfers(data)
+	if err == core.ErrNotFoundSign {
+		err = nil
+	}
 	if err != nil {
 		return nil, err
 	}
