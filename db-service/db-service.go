@@ -6,6 +6,7 @@ import (
 	slog "log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/empirefox/esecend/config"
@@ -47,6 +48,7 @@ func NewDbService(config *config.Config, wc *wx.WxClient, isDebug bool) (*DbServ
 	}
 	db_.SetMaxIdleConns(conf.MaxIdle)
 	db_.SetMaxOpenConns(conf.MaxOpen)
+	db_.SetConnMaxLifetime(time.Duration(conf.Timeout+5) * time.Second)
 
 	var reformLogger reform.Logger
 	if isDebug {
