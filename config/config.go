@@ -67,6 +67,7 @@ type Mysql struct {
 	Host     string
 	Port     int
 	Database string
+	Timeout  int `default:"30"`
 	MaxIdle  int
 	MaxOpen  int
 }

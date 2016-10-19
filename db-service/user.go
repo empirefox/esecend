@@ -71,7 +71,7 @@ func (dbs *DbService) UserWithdraw(tokUsr *models.User, payload *front.WithdrawP
 	cash := &front.UserCash{
 		UserID:    tokUsr.ID,
 		CreatedAt: now,
-		Type:      front.TUserCashPreWithdraw,
+		Type:      front.TUserCashWithdraw,
 		Amount:    -int(payload.Amount),
 		Balance:   top.Balance - int(payload.Amount),
 	}

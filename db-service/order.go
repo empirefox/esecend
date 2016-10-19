@@ -755,6 +755,9 @@ func (dbs *DbService) OrderChangeState(
 		return
 
 	case front.TOrderStateReturnStarted:
+		if order.PointsPaid != 0 {
+			return cerr.NoAbcOrPoints
+		}
 		if dbs.IsOrderCompleted(order) {
 			err = cerr.OrderCompleteTimeout
 			return

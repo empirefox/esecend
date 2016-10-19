@@ -42,10 +42,10 @@ func NewCaptchar(font string) (Captchar, error) {
 	cap.SetDisturbance(captcha.MEDIUM)
 	cap.SetBkgColor(color.RGBA{255, 255, 255, 255})
 	cap.SetFrontColor(
-		color.RGBA{232, 232, 255, 255},
+		color.RGBA{255, 153, 18, 255},
 		color.RGBA{128, 128, 192, 255},
 		color.RGBA{232, 208, 152, 255},
-		color.RGBA{239, 239, 218, 255},
+		color.RGBA{41, 36, 33, 255},
 		color.RGBA{51, 102, 153, 255},
 		color.RGBA{102, 153, 204, 255},
 		color.RGBA{180, 91, 62, 255},
