@@ -131,7 +131,8 @@ func (s *Server) GetEvals(c *gin.Context) {
 		return
 	}
 
-	data, err := s.DB.GetDB().FindAllFrom(front.EvalItemView, front.OrderItemTable.ToCol("ProductID"), productId)
+	ds := s.DB.DS.Where(goqu.I(front.OrderItemTable.ToCol("ProductID")).Eq(productId), goqu.I("$EvalAt").Neq(0))
+	data, err := s.DB.GetDB().DsFindAllFrom(front.EvalItemView, ds)
 	if Abort(c, err) {
 		return
 	}
