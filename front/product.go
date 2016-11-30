@@ -15,6 +15,7 @@ const (
 type Product struct {
 	ID         uint    `reform:"product_id,pk"`
 	Name       string  `reform:"product_name"`
+	HomeImg    string  `reform:"photo_thumb"`
 	Img        string  `reform:"photo"`
 	Intro      string  `reform:"intro"`
 	Detail     string  `reform:"detail"`

@@ -6,6 +6,7 @@ type Store struct {
 	ID        uint   `reform:"id,pk"`
 	CreatedAt int64  `reform:"created_at"`
 	Name      string `reform:"name"`
+	Amap      string `reform:"amap"`
 	User1     uint   `reform:"user1"`
 }
 
