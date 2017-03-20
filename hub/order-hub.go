@@ -63,6 +63,7 @@ func (hub *OrderHub) run(input interface{}) {
 }
 
 func (hub *OrderHub) Run() {
+	hub.onMaintain()
 	ticker := time.NewTicker(time.Duration(hub.config.MaintainTimeMinute) * time.Minute)
 	defer func() {
 		ticker.Stop()

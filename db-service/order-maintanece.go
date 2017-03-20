@@ -381,7 +381,7 @@ func (dbs *DbService) IsOrderEvaled(order *front.Order) bool {
 }
 
 func (dbs *DbService) IsOrderAutoEvaledUnsaved(order *front.Order) bool {
-	return order.DeliveredAt != 0 && dbs.isOrderAutoEvaledUnsaved(order)
+	return order.DeliveredAt != 0 && order.EvalAt == 0 && dbs.isOrderAutoEvaledUnsaved(order)
 }
 
 func (dbs *DbService) isOrderAutoEvaledUnsaved(order *front.Order) bool {
