@@ -8,8 +8,8 @@ import (
 type ErrorsParser int
 
 const (
-	ParseGinValidator ErrorsParser = iota
-	ParseGovalidator
+	ParseGinValidator ErrorsParser = iota // github.com/go-playground/validator. TODO rename
+	ParseGovalidator                      // github.com/asaskevich/govalidator
 	ParseEfValidator
 	ParseCode
 )
